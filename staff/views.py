@@ -494,12 +494,6 @@ def startups(request):
             industry_options.append({'value': f'industry:{industry}', 'label': industry})
     query_params = request.GET.copy()
     query_params.pop('page', None)
-    showcase = list(startup_list.filter(story_slides__isnull=False).distinct()[:8])
-    if len(showcase) < 8:
-        showcased_ids = [item.pk for item in showcase]
-        showcase.extend(
-            list(startup_list.exclude(pk__in=showcased_ids)[:8 - len(showcase)])
-        )
     page_obj = Paginator(startup_list, 25).get_page(request.GET.get('page'))
     for item in page_obj.object_list:
         item.industry_icon = _startup_industry_icon(item.industry)
@@ -534,7 +528,6 @@ def startups(request):
         'impact_default_period': current_period['key'],
         'impact_startups': impact_startups,
         'page_obj': page_obj,
-        'showcase': showcase,
         'filter_type': startup_type or '',
         'search_query': search_query,
         'industry_filter': industry_filter,
