@@ -22,7 +22,6 @@ class Startup(models.Model):
     CONTRACT_CHOICES = [
         ('draft', 'Draft'),
         ('active', 'Active'),
-        ('inactive', 'Inactive'),
         ('expired', 'Expired'),
         ('terminated', 'Terminated'),
     ]
