@@ -5,7 +5,7 @@
 {% block page_title %}Startups{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'style/startups-yc.css' %}?v=20261007-yc5">
+<link rel="stylesheet" href="{% static 'style/startups-yc.css' %}?v=20261007-yc6">
 <style>
     .yc-page .yc-eyebrow::before { background: #000 !important; }
     .yc-page .yc-hero-title sup { color: #000 !important; }
@@ -175,10 +175,9 @@
                     {% if s.description %}<p class="yc-card-desc">{{ s.description|truncatewords:18 }}</p>{% endif %}
                     <div class="yc-card-foot">
                         <span class="yc-card-ind">{{ s.industry|default:"Venture" }}</span>
-                        <span class="yc-card-cta">Profile <i class="fas fa-arrow-right"></i></span>
+                        <a class="yc-card-cta" href="{% url 'staff:startup_profile' slug=s.slug %}" aria-label="View profile for {{ s.name }}">View profile <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
                     </div>
                 </div>
-                <a class="yc-card-link" href="{% url 'staff:startup_profile' slug=s.slug %}" aria-label="Open profile for {{ s.name }}"></a>
             </article>
             {% empty %}
             <div class="yc-empty">

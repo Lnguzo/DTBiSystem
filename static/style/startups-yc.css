@@ -653,23 +653,17 @@
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--yc-ink);
+  text-decoration: none;
 }
 
 .yc-card-cta i { transition: transform 0.25s ease; }
 .yc-card:hover .yc-card-cta i { transform: translateX(4px); }
 .yc-card:hover .yc-card-cta { color: var(--yc-accent); }
 
-/* stretched link: whole card is clickable */
-.yc-card-link { font-size: 0; }
-.yc-card-link::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-.yc-card-link:focus-visible::after {
+.yc-card-cta:focus-visible {
   outline: 2px solid var(--yc-accent);
-  outline-offset: -3px;
+  outline-offset: 3px;
+  border-radius: 3px;
 }
 
 /* ---------- badges & pills ---------- */
