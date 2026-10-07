@@ -494,7 +494,12 @@ def startups(request):
             industry_options.append({'value': f'industry:{industry}', 'label': industry})
     query_params = request.GET.copy()
     query_params.pop('page', None)
-    showcase = list(startup_list[:8])
+    showcase = list(startup_list.filter(story_slides__isnull=False).distinct()[:8])
+    if len(showcase) < 8:
+        showcased_ids = [item.pk for item in showcase]
+        showcase.extend(
+            list(startup_list.exclude(pk__in=showcased_ids)[:8 - len(showcase)])
+        )
     page_obj = Paginator(startup_list, 25).get_page(request.GET.get('page'))
     for item in page_obj.object_list:
         item.industry_icon = _startup_industry_icon(item.industry)
@@ -810,39 +815,35 @@ def startup_create(request):
 
 
 def _startup_lifecycle_data(startup):
+    """Return only recorded startup results and lifecycle dates."""
     from django.db.models.functions import ExtractYear
     from .models import MentorEngagement, ParticipantJourney, ParticipantOutcome, ParticipantSupport
 
     current_year = timezone.localdate().year
-    lifecycle_rows, lifetime = _startup_impact_rows([startup], 1900, current_year)
-    lifecycle_row = lifecycle_rows[0]
-    lifecycle_row['cohort_year'] = startup.year_incubated or (startup.incubation_start.year if startup.incubation_start else None) or (startup.founded_date.year if startup.founded_date else None)
-    lifecycle_row = _apply_illustrative_metrics(lifecycle_row, allow_without_cohort=True)
+    rows, _ = _startup_impact_rows([startup], 1900, current_year)
+    row = rows[0]
+    measures = (
+        ('participant_journeys_started', 'Participant journeys', 'fa-route'),
+        ('support_activities', 'Support activities', 'fa-hand-holding-heart'),
+        ('mentor_sessions', 'Completed mentor sessions', 'fa-chalkboard-user'),
+        ('participants_with_outcomes', 'Participant outcomes', 'fa-chart-line'),
+        ('full_time_jobs', 'Reported full-time jobs', 'fa-people-group'),
+        ('part_time_jobs', 'Reported part-time jobs', 'fa-user-group'),
+    )
     achievements = [
-        {'icon': 'fa-route', 'label': 'Participant journeys', 'value': lifecycle_row['participant_journeys_started'], 'illustrative': 'journeys' in lifecycle_row['illustrative_groups']},
-        {'icon': 'fa-hand-holding-heart', 'label': 'Support activities', 'value': lifecycle_row['support_activities'], 'illustrative': 'support' in lifecycle_row['illustrative_groups']},
-        {'icon': 'fa-chalkboard-user', 'label': 'Completed mentor sessions', 'value': lifecycle_row['mentor_sessions'], 'illustrative': 'mentoring' in lifecycle_row['illustrative_groups']},
-        {'icon': 'fa-chart-line', 'label': 'Participant outcomes', 'value': lifecycle_row['participants_with_outcomes'], 'illustrative': 'outcomes' in lifecycle_row['illustrative_groups']},
-        {'icon': 'fa-people-group', 'label': 'Reported full-time jobs', 'value': lifecycle_row['full_time_jobs'], 'illustrative': 'outcomes' in lifecycle_row['illustrative_groups']},
-        {'icon': 'fa-user-group', 'label': 'Reported part-time jobs', 'value': lifecycle_row['part_time_jobs'], 'illustrative': 'outcomes' in lifecycle_row['illustrative_groups']},
+        {'icon': icon, 'label': label, 'value': row[key]}
+        for key, label, icon in measures if row[key]
     ]
+
     timeline = []
     if startup.founded_date:
-        timeline.append({'year': startup.founded_date.year, 'date': startup.founded_date, 'title': 'Founded', 'detail': startup.founded_date.strftime('%d %b %Y'), 'icon': 'fa-flag'})
+        timeline.append({'date': startup.founded_date, 'title': 'Founded', 'detail': startup.founded_date.strftime('%d %b %Y')})
     if startup.year_incubated:
-        timeline.append({'year': startup.year_incubated, 'date': date(startup.year_incubated, 1, 1), 'title': 'DTBi cohort', 'detail': f'Cohort year {startup.year_incubated}', 'icon': 'fa-layer-group'})
+        timeline.append({'date': date(startup.year_incubated, 1, 1), 'title': 'DTBi cohort', 'detail': f'Cohort year {startup.year_incubated}'})
     if startup.incubation_start:
-        timeline.append({'year': startup.incubation_start.year, 'date': startup.incubation_start, 'title': 'Incubation started', 'detail': startup.incubation_start.strftime('%d %b %Y'), 'icon': 'fa-play'})
+        timeline.append({'date': startup.incubation_start, 'title': 'Incubation started', 'detail': startup.incubation_start.strftime('%d %b %Y')})
     if startup.incubation_end:
-        timeline.append({'year': startup.incubation_end.year, 'date': startup.incubation_end, 'title': 'Incubation ended', 'detail': startup.incubation_end.strftime('%d %b %Y'), 'icon': 'fa-check'})
-    if not startup.founded_date:
-        timeline.append({'year': startup.year_incubated or current_year - 2, 'date': date(startup.year_incubated or current_year - 2, 1, 1), 'title': 'Founded' , 'detail': 'Date to confirm with the organization', 'icon': 'fa-flag', 'illustrative': True})
-    if not startup.incubation_start:
-        illustrative_year = startup.year_incubated or current_year - 2
-        timeline.append({'year': illustrative_year, 'date': date(illustrative_year, 2, 1), 'title': 'Incubation start' , 'detail': 'Date to confirm with programme records', 'icon': 'fa-play', 'illustrative': True})
-    if not startup.incubation_end:
-        illustrative_year = (startup.year_incubated or current_year - 2) + 1
-        timeline.append({'year': illustrative_year, 'date': date(illustrative_year, 12, 31), 'title': 'Incubation end' , 'detail': 'Date to confirm with programme records', 'icon': 'fa-check', 'illustrative': True})
+        timeline.append({'date': startup.incubation_end, 'title': 'Incubation ended', 'detail': startup.incubation_end.strftime('%d %b %Y')})
 
     years = {}
     support_by_year = ParticipantSupport.objects.filter(journey__startup=startup).annotate(year=ExtractYear('delivered_on')).values('year').annotate(total=Count('pk'))
@@ -862,66 +863,44 @@ def _startup_lifecycle_data(startup):
             detail.append(f"{values['sessions']} completed mentor sessions")
         if values.get('outcomes'):
             detail.append(f"{values['outcomes']} outcome records")
-        timeline.append({'year': year, 'date': date(year, 1, 1), 'title': f'Programme activity · {year}', 'detail': ' · '.join(detail), 'icon': 'fa-chart-column'})
+        if detail:
+            timeline.append({'date': date(year, 1, 1), 'title': f'Programme activity · {year}', 'detail': ' · '.join(detail)})
     timeline.sort(key=lambda item: (item['date'], item['title']))
     return achievements, timeline
 
 
-
 def _startup_profile_demo_data(startup):
-    """Build display-only example values for blank profile panels; never persist them."""
-    from types import SimpleNamespace
-
-    seed = _illustrative_startup_metrics(startup)['participant_journeys_started']
-    industry = startup.industry or 'Innovation and technology'
-    year = startup.year_incubated or (startup.incubation_start.year if startup.incubation_start else None) or (startup.founded_date.year if startup.founded_date else timezone.localdate().year - 2)
-    founders = list(startup.founders.all()) or [SimpleNamespace(
-        name=f'{startup.name} Demo Founder', get_role_display=lambda: 'Founder',
-        bio='Founder profile and organization leadership.',
-        email=f'founder+{startup.slug}@example.test', linkedin='', twitter='', is_illustrative=True,
-    )]
-    opportunities = list(startup.opportunities.all()) or [SimpleNamespace(
-        get_opportunity_type_display=lambda: 'Acceleration', status='open', get_status_display=lambda: 'Open',
-        title='Growth opportunity',
-        description='Explore upcoming opportunities in the ecosystem and find the right fit for your organization.',
-        deadline=timezone.localdate() + timezone.timedelta(days=90), is_illustrative=True,
-    )]
-    fundings = list(startup.fundings.all()) or [SimpleNamespace(
-        source='Investment fund', amount=25000 + seed * 500, get_funding_type_display=lambda: 'Seed',
-        status='received', get_status_display=lambda: 'Received', date_received=timezone.localdate().replace(day=1), is_illustrative=True,
-    )]
-    kpis = list(startup.kpis.all()) or [SimpleNamespace(
-        metric_name='Customers reached', metric_value=seed * 18, unit='people',
-        target_value=seed * 25, achievement_pct=round(seed * 18 / (seed * 25) * 100),
-        get_period_display=lambda: 'Annual measure', is_illustrative=True,
-    )]
-    pitch_decks = list(startup.pitch_decks.all()) or [SimpleNamespace(
-        title=f'{startup.name} organization overview', description='Organization presentation summary.',
-        presentation_date=date(year, 1, 1), file=None, is_illustrative=True,
-    )]
-    services = list(startup.services.all()) or [SimpleNamespace(
-        get_category_display=lambda: industry, name=f'{industry} solutions',
-        description='Services supporting this organization.', is_illustrative=True,
-    )]
+    """Return recorded profile data without filling missing details with examples."""
+    founders = list(startup.founders.all())
+    opportunities = list(startup.opportunities.all())
+    fundings = list(startup.fundings.all())
+    kpis = list(startup.kpis.all())
+    pitch_decks = list(startup.pitch_decks.all())
+    services = list(startup.services.all())
     demo_fields = {
-        'industry': industry,
-        'website': startup.website or f'https://example.org/ventures/{startup.slug}',
-        'founded_year': startup.founded_date.year if startup.founded_date else year,
-        'contact_email': startup.contact_email or f'hello+{startup.slug}@example.test',
-        'phone': startup.phone or '+255 700 000 000',
-        'year_incubated': year,
-        'source': startup.source or 'DTBi portfolio',
-        'incubation_start': startup.incubation_start or date(year, 1, 1),
-        'incubation_end': startup.incubation_end or date(year + 1, 12, 31),
+        'industry': startup.industry,
+        'website': startup.website,
+        'founded_year': startup.founded_date.year if startup.founded_date else None,
+        'contact_email': startup.contact_email,
+        'phone': startup.phone,
+        'contact_person': startup.contact_person,
+        'contact_address': startup.contact_address,
+        'year_incubated': startup.year_incubated or (startup.incubation_start.year if startup.incubation_start else None),
+        'source': startup.source,
+        'incubation_start': startup.incubation_start,
+        'incubation_end': startup.incubation_end,
     }
     return {
-        'profile_founders': founders, 'profile_opportunities': opportunities,
-        'profile_fundings': fundings, 'profile_kpis': kpis,
-        'profile_pitch_decks': pitch_decks, 'profile_services': services,
-        'profile_demo': any(getattr(items[0], 'is_illustrative', False) for items in (founders, opportunities, fundings, kpis, pitch_decks, services)),
+        'profile_founders': founders,
+        'profile_opportunities': opportunities,
+        'profile_fundings': fundings,
+        'profile_kpis': kpis,
+        'profile_pitch_decks': pitch_decks,
+        'profile_services': services,
+        'profile_demo': False,
         'demo_fields': demo_fields,
-        'display_funding_total': sum(item.amount for item in startup.fundings.all()) if startup.fundings.exists() else fundings[0].amount,
-        'display_funding_count': startup.fundings.count() or 1,
+        'display_funding_total': sum(item.amount for item in fundings),
+        'display_funding_count': len(fundings),
     }
 
 def startup_profile(request, slug):
@@ -989,6 +968,9 @@ def startup_profile(request, slug):
     profile_demo = _startup_profile_demo_data(startup)
     context = {
         'startup': startup,
+        'startup_public_sections': startup.public_sections.all(),
+        'startup_story_slides': startup.story_slides.all(),
+        'startup_team_members': startup.team_members.all(),
         'form': form,
         'founder_formset': founder_formset,
         'opportunity_formset': opportunity_formset,

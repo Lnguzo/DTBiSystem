@@ -7,6 +7,7 @@ from .models import (
     Partnership, PartnershipHistory, Startup, StartupStatusHistory, UserProfile,
     ParticipantJourney, ParticipantJourneyHistory, ParticipantSupport,
     ParticipantFollowUp, ParticipantFollowUpHistory, ParticipantOutcome,
+    StartupPublicSection, StartupStorySlide, StartupTeamMember,
 )
 
 
@@ -40,7 +41,7 @@ class StartupAdmin(admin.ModelAdmin):
     readonly_fields = ('slug', 'profile_completion', 'created_at', 'updated_at')
     fieldsets = (
         ('BUNI startup information', {
-            'fields': ('name', 'startup_type', 'description', 'industry', 'website', 'contact_email', 'phone', 'source')
+            'fields': ('name', 'startup_type', 'description', 'industry', 'website', 'contact_person', 'contact_email', 'phone', 'contact_address', 'source')
         }),
         ('Approval and programme status', {
             'fields': ('status', 'contract_status', 'profile_completion', 'directory_visible', 'year_incubated')
@@ -260,3 +261,27 @@ class ParticipantOutcomeAdmin(admin.ModelAdmin):
     list_display = ('journey', 'recorded_on', 'full_time_jobs', 'part_time_jobs', 'monthly_revenue', 'revenue_currency', 'customers_or_users')
     list_filter = ('recorded_on', 'revenue_currency')
     search_fields = ('journey__participant_name', 'journey__startup__name', 'milestone')
+
+
+@admin.register(StartupPublicSection)
+class StartupPublicSectionAdmin(admin.ModelAdmin):
+    list_display = ('startup', 'title', 'sort_order')
+    list_filter = ('startup',)
+    search_fields = ('startup__name', 'title', 'body', 'source_note')
+    list_editable = ('sort_order',)
+
+
+@admin.register(StartupStorySlide)
+class StartupStorySlideAdmin(admin.ModelAdmin):
+    list_display = ('startup', 'title', 'sort_order')
+    list_filter = ('startup',)
+    search_fields = ('startup__name', 'title', 'caption')
+    list_editable = ('sort_order',)
+
+
+@admin.register(StartupTeamMember)
+class StartupTeamMemberAdmin(admin.ModelAdmin):
+    list_display = ('startup', 'name', 'title', 'sort_order')
+    list_filter = ('startup', 'title')
+    search_fields = ('startup__name', 'name', 'title', 'bio')
+    list_editable = ('sort_order',)

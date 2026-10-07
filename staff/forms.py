@@ -41,7 +41,7 @@ class StartupForm(forms.ModelForm):
         model = Startup
         fields = [
             'name', 'startup_type', 'description', 'industry', 'website',
-            'contact_email', 'phone', 'source',
+            'contact_email', 'phone', 'contact_person', 'contact_address', 'source',
             'logo', 'cover_image', 'founded_date', 'incubation_start',
             'incubation_end', 'year_incubated', 'contract_status', 'status',
         ]
@@ -53,6 +53,8 @@ class StartupForm(forms.ModelForm):
             'website': forms.URLInput(attrs={'class': 'form-input', 'placeholder': 'https://...'}),
             'contact_email': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'startup@example.com'}),
             'phone': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '+255...'}),
+            'contact_person': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Primary business contact'}),
+            'contact_address': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Postal or business address'}),
             'source': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'BUNI workbook'}),
             'founded_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
             'incubation_start': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
@@ -73,7 +75,7 @@ class StartupOwnerForm(StartupForm):
     class Meta(StartupForm.Meta):
         fields = [
             'name', 'startup_type', 'description', 'industry', 'website',
-            'contact_email', 'phone',
+            'contact_email', 'phone', 'contact_person', 'contact_address',
             'logo', 'cover_image', 'founded_date', 'year_incubated',
             'contract_status',
         ]

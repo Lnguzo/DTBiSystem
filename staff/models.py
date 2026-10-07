@@ -34,6 +34,8 @@ class Startup(models.Model):
     website = models.URLField(blank=True)
     contact_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
+    contact_person = models.CharField(max_length=255, blank=True)
+    contact_address = models.CharField(max_length=255, blank=True)
     source = models.CharField(max_length=255, default='DTBi')
     directory_visible = models.BooleanField(default=True)
     logo = models.ImageField(upload_to='startups/logos/', blank=True, null=True)
@@ -794,3 +796,56 @@ class PartnershipHistory(models.Model):
 
     def __str__(self):
         return f'{self.partnership}: {self.old_status or "submitted"} → {self.new_status}'
+
+
+class StartupPublicSection(models.Model):
+    """An ordered, source-backed section of a public startup profile."""
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='public_sections')
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    source_note = models.CharField(max_length=255, blank=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'pk']
+
+    def __str__(self):
+        return f'{self.startup.name}: {self.title}'
+
+
+class StartupStorySlide(models.Model):
+    """A visual item for the animated, public startup story carousel."""
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='story_slides')
+    title = models.CharField(max_length=255)
+    caption = models.TextField(blank=True)
+    image_path = models.CharField(
+        max_length=255,
+        help_text='Path relative to static/, for example img/startups/example-cover.jpg.',
+    )
+    alt_text = models.CharField(max_length=255, blank=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'pk']
+
+    def __str__(self):
+        return f'{self.startup.name}: {self.title}'
+
+
+class StartupTeamMember(models.Model):
+    """A named management or team profile published by a startup."""
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='team_members')
+    name = models.CharField(max_length=255)
+    title = models.CharField(max_length=120, blank=True)
+    bio = models.TextField(blank=True)
+    photo = models.ImageField(upload_to='startups/team/', blank=True, null=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'pk']
+
+    def __str__(self):
+        return f'{self.name} - {self.startup.name}'
