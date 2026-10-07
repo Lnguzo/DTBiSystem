@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ mentor.name }} - Mentor{% endblock %}
+{% block page_title %}Mentor Profile{% endblock %}
+{% block content %}
+<style></style>
+<div class="filter-bar">
+    <a class="btn btn-outline" href="{% url 'mentors' %}">Mentors</a>
+    {% if can_record_session %}<a class="btn btn-primary" href="{% url 'staff:mentor_sessions' %}?mentor={{ mentor.pk }}"><i class="fas fa-calendar-plus"></i> Arrange a session</a>{% endif %}
+</div>
+
+<section class="card mt-20" style="overflow:hidden">
+    <div style="padding:26px;display:flex;align-items:center;gap:18px;background:linear-gradient(120deg,#12304d,#176c78);color:white">
+        <div class="person-avatar blue" style="width:72px;height:72px;font-size:1.25rem;border:3px solid #ffffff9c">{{ mentor.name|slice:":2"|upper }}</div>
+        <div><span class="overview-kicker" style="color:#c7e7ef">BUNI &amp; DTBi mentor profile</span><h2 style="color:white;margin:5px 0">{{ mentor.name }}</h2><p style="margin:0;color:#dcebf0">{{ mentor_display.role }} &middot; {{ mentor_display.education }} </p></div>
+    </div>
+    <div class="card-body"><h3>Expertise</h3><p>{{ mentor_display.skills }} </p><h3>Topics they can support</h3><p>{{ mentor_display.topics }} </p>{% if can_view_contact %}<p>Email: <a href="mailto:{{ mentor_display.email }}">{{ mentor_display.email }}</a> </p><p>Phone: {{ mentor_display.phone }} </p>{% endif %}</div>
+</section>
+
+{% if can_view_activity %}
+<section class="card mt-20">
+    <div class="card-header"><h3>Upcoming and confirmed sessions</h3></div>
+    <div class="card-body">
+        {% for session in scheduled_sessions %}
+        <p><strong>{{ session.date|date:'D, d M Y' }} {{ session.start_time|time:'H:i' }}</strong> &middot; {{ session.startup.name }} &middot; {{ session.get_status_display }} &middot; {{ session.hours }} hours {% if session.meeting_url %}&middot; <a href="{{ session.meeting_url }}" target="_blank" rel="noopener noreferrer">Meeting link</a>{% endif %}</p>
+        {% empty %}<p>No sessions are currently scheduled with this mentor.</p>{% endfor %}
+        <a href="{% url 'staff:mentor_sessions' %}?mentor={{ mentor.pk }}">Manage session arrangements</a>
+    </div>
+</section>
+{% endif %}
+
+{% if can_record_session %}
+<section class="card mt-20 mentor-session-record-card">
+    <div class="card-header">
+        <div><h3>Record completed mentoring session</h3><p class="text-muted">Add the startup, session date, duration, and a short summary.</p></div>
+    </div>
+    <div class="card-body">
+        <form method="post" class="session-form-grid mentor-completed-session-form">
+            {% csrf_token %}
+            <div class="session-form-field session-form-field-wide">
+                <label for="session-startup">Startup</label>
+                <select id="session-startup" class="form-select" name="startup" required>
+                    <option value="">Select startup</option>
+                    {% for startup in startups %}<option value="{{ startup.pk }}">{{ startup.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="session-form-field">
+                <label for="session-date">Date</label>
+                <input id="session-date" class="form-input" type="date" name="date" required>
+            </div>
+            <div class="session-form-field">
+                <label for="session-hours">Duration (hours)</label>
+                <input id="session-hours" class="form-input" type="number" name="hours" min="0.25" step="0.25" value="1" required>
+            </div>
+            <div class="session-form-field">
+                <label for="session-topics">Topics</label>
+                <input id="session-topics" class="form-input" name="topics" placeholder="Main topics covered">
+            </div>
+            <div class="session-form-field session-form-field-wide">
+                <label for="session-outcome">Outcome and notes</label>
+                <textarea id="session-outcome" class="form-textarea" name="outcome" rows="4" placeholder="Summarize the outcome or agreed next steps"></textarea>
+            </div>
+            <div class="session-form-actions">
+                <button class="btn btn-primary" type="submit">Save completed session</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endif %}
+
+{% if can_view_activity %}
+<section class="card mt-20">
+    <div class="card-header"><h3>Completed mentoring sessions</h3></div>
+    <div class="card-body">
+        {% for session in sessions %}<p>{{ session.date }} &middot; {{ session.startup.name }} &middot; {{ session.hours }} hours &middot; {{ session.topics|default:'Topics not recorded' }}</p>
+        {% empty %}<p>No completed mentoring sessions recorded yet.</p>{% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

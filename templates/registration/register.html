@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Create Account — DTBi | BUNI Innovation Management System{% endblock %}
+{% block page_title %}Register{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+    <div class="auth-intro">
+        <span class="auth-eyebrow"><i class="fas fa-seedling"></i> Join the innovation network</span>
+        <h1>Build your next chapter.</h1>
+        <p>Create a profile for your startup and bring your people, progress, opportunities, and proof of growth together.</p>
+        <div class="auth-intro-points">
+            <span><i class="fas fa-check"></i> Startup profile workspace</span>
+            <span><i class="fas fa-check"></i> Funding and KPI tracking</span>
+        </div>
+    </div>
+    <div class="auth-card">
+        <div class="auth-card-header">
+            <img src="{% static 'img/brands/dtbi logo.png' %}" alt="DTBi logo">
+            <div><span class="auth-card-kicker">DTBi | BUNI</span><h2>Create account</h2></div>
+        </div>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post" class="auth-form">
+            {% csrf_token %}
+
+            <div class="auth-field">
+                <i class="fas fa-user auth-field-icon" aria-hidden="true"></i>
+                <input type="text" name="username" id="username" placeholder=" " autocomplete="username" required>
+                <label for="username">Username</label>
+            </div>
+
+            <div class="auth-field">
+                <i class="fas fa-envelope auth-field-icon" aria-hidden="true"></i>
+                <input type="email" name="email" id="email" placeholder=" " autocomplete="email" required>
+                <label for="email">Email</label>
+            </div>
+
+            <div class="auth-field">
+                <i class="fas fa-lock auth-field-icon" aria-hidden="true"></i>
+                <input type="password" name="password" id="password" placeholder=" " autocomplete="new-password" required>
+                <label for="password">Password</label>
+                <button type="button" class="auth-reveal" data-toggle-password="password" aria-label="Show password" aria-pressed="false">
+                    <i class="fas fa-eye" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label for="user_type">User Type</label>
+                <div class="auth-select-wrap">
+                    <i class="fas fa-user-shield auth-select-icon" aria-hidden="true"></i>
+                    <select name="user_type" id="user_type" class="form-select">
+                        {% for value, label in user_types %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="auth-submit">Create Account</button>
+        </form>
+        <p class="auth-footer-note">Already have an account? <a href="{% url 'staff:user_login' %}">Sign in</a></p>
+    </div>
+</div>
+{% endblock %}

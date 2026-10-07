@@ -1,0 +1,796 @@
+from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils.text import slugify
+from django.urls import reverse
+from django.contrib.auth.models import User
+from django.utils import timezone
+from .storage import PrivateImportStorage
+
+
+class Startup(models.Model):
+    TYPE_CHOICES = [
+        ('public', 'Public'),
+        ('individual', 'Individual'),
+    ]
+
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+        ('pending', 'Pending'),
+    ]
+
+    CONTRACT_CHOICES = [
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('expired', 'Expired'),
+        ('terminated', 'Terminated'),
+    ]
+
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True, blank=True)
+    startup_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='public')
+    description = models.TextField(blank=True)
+    industry = models.CharField(max_length=100, blank=True)
+    website = models.URLField(blank=True)
+    contact_email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    source = models.CharField(max_length=255, default='DTBi')
+    directory_visible = models.BooleanField(default=True)
+    logo = models.ImageField(upload_to='startups/logos/', blank=True, null=True)
+    cover_image = models.ImageField(upload_to='startups/covers/', blank=True, null=True)
+
+    # Incubation
+    founded_date = models.DateField(null=True, blank=True)
+    incubation_start = models.DateField(null=True, blank=True)
+    incubation_end = models.DateField(null=True, blank=True)
+    year_incubated = models.PositiveIntegerField(null=True, blank=True)
+
+    # Contract
+    contract_status = models.CharField(max_length=20, choices=CONTRACT_CHOICES, default='draft', blank=True)
+
+    # Profile
+    profile_completion = models.PositiveIntegerField(default=0, help_text='Percentage of profile completed')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.name) or 'startup'
+            slug = base
+            suffix = 1
+            qs = Startup.objects.exclude(pk=self.pk)
+            while qs.filter(slug=slug).exists():
+                suffix += 1
+                slug = f'{base}-{suffix}'
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('staff:startup_profile', kwargs={'slug': self.slug})
+
+    def calc_profile_completion(self):
+        fields = [
+            self.description, self.industry, self.website,
+            self.founded_date, self.incubation_start,
+        ]
+        filled = sum(1 for f in fields if f)
+        has_founder = self.founders.exists()
+        has_opportunity = self.opportunities.exists()
+        has_kpi = self.kpis.exists()
+        has_pitch = self.pitch_decks.exists()
+        has_service = self.services.exists()
+
+        total = len(fields) + 4
+        filled += sum([has_founder, has_opportunity, has_kpi, has_pitch, has_service])
+        return round((filled / total) * 100) if total else 0
+
+
+class Founder(models.Model):
+    ROLE_CHOICES = [
+        ('founder', 'Founder'),
+        ('co_founder', 'Co-Founder'),
+    ]
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='founders')
+    name = models.CharField(max_length=255)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='founder')
+    bio = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to='founders/avatars/', blank=True, null=True)
+    linkedin = models.URLField(blank=True)
+    twitter = models.URLField(blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_role_display()})"
+
+
+class Mentor(models.Model):
+    """A mentor imported or maintained from BUNI participant records."""
+    name = models.CharField(max_length=255)
+    email = models.EmailField(blank=True)
+    gender = models.CharField(max_length=50, blank=True)
+    education_level = models.CharField(max_length=255, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    role = models.CharField(max_length=255, blank=True)
+    skills = models.TextField(blank=True)
+    training_topics = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='mentor_record')
+    source = models.CharField(max_length=255, default='BUNI')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Investor(models.Model):
+    """An investor or funding contact represented in the BUNI source data."""
+    name = models.CharField(max_length=255)
+    organization = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    website = models.URLField(blank=True)
+    description = models.TextField(blank=True)
+    investment_interest = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=50, default='active')
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='investor_record')
+    source = models.CharField(max_length=255, default='BUNI')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.organization or self.name
+
+
+class MentorEngagement(models.Model):
+    """A scheduled or completed mentoring session linked to a startup."""
+    STATUS_CHOICES = [
+        ('scheduled', 'Scheduled'),
+        ('confirmed', 'Confirmed'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+        ('no_show', 'No Show'),
+    ]
+
+    mentor = models.ForeignKey(Mentor, on_delete=models.PROTECT, related_name='engagements')
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='mentor_engagements')
+    date = models.DateField()
+    start_time = models.TimeField(null=True, blank=True)
+    hours = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+    topics = models.TextField(blank=True)
+    outcome = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='completed')
+    meeting_location = models.CharField(max_length=255, blank=True)
+    meeting_url = models.URLField(blank=True)
+    scheduled_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='scheduled_mentor_sessions',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', 'mentor__name']
+        indexes = [models.Index(fields=['date']), models.Index(fields=['status', 'date', 'start_time'])]
+
+    def clean(self):
+        if self.status in {'scheduled', 'confirmed'}:
+            if self.start_time is None:
+                raise ValidationError({'start_time': 'A start time is required for scheduled sessions.'})
+            if self.hours <= 0:
+                raise ValidationError({'hours': 'Scheduled sessions must have a duration greater than zero.'})
+            today = timezone.localdate()
+            if self.date < today:
+                raise ValidationError({'date': 'Choose today or a future date for a scheduled session.'})
+            if self.date == today and self.start_time <= timezone.localtime().time().replace(tzinfo=None):
+                raise ValidationError({'start_time': 'Choose a start time that has not passed.'})
+
+    def __str__(self):
+        return f'{self.mentor} — {self.startup} ({self.date} {self.start_time or ""})'
+
+
+class MentorEngagementHistory(models.Model):
+    engagement = models.ForeignKey(
+        MentorEngagement, on_delete=models.CASCADE, related_name='history',
+    )
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, choices=MentorEngagement.STATUS_CHOICES)
+    old_date = models.DateField(null=True, blank=True)
+    new_date = models.DateField()
+    old_start_time = models.TimeField(null=True, blank=True)
+    new_start_time = models.TimeField(null=True, blank=True)
+    changed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='mentor_session_changes',
+    )
+    note = models.TextField(blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+        indexes = [models.Index(fields=['changed_at', 'new_status'])]
+
+    def __str__(self):
+        return f'{self.engagement}: {self.old_status or "created"} → {self.new_status}'
+
+
+class Opportunity(models.Model):
+    TYPE_CHOICES = [
+        ('funding', 'Funding'),
+        ('mentorship', 'Mentorship'),
+        ('partnership', 'Partnership'),
+        ('market_access', 'Market Access'),
+        ('acceleration', 'Acceleration'),
+    ]
+
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('closed', 'Closed'),
+        ('filled', 'Filled'),
+    ]
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='opportunities')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    opportunity_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='funding')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    deadline = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+class Funding(models.Model):
+    TYPE_CHOICES = [
+        ('pre_seed', 'Pre-Seed'),
+        ('seed', 'Seed'),
+        ('series_a', 'Series A'),
+        ('series_b', 'Series B'),
+        ('series_c', 'Series C'),
+        ('grant', 'Grant'),
+        ('debt', 'Debt'),
+        ('other', 'Other'),
+    ]
+
+    STATUS_CHOICES = [
+        ('committed', 'Committed'),
+        ('received', 'Received'),
+        ('pending', 'Pending'),
+        ('declined', 'Declined'),
+    ]
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='fundings')
+    investor = models.ForeignKey(
+        Investor, on_delete=models.SET_NULL, null=True, blank=True, related_name='fundings'
+    )
+    source = models.CharField(max_length=255, help_text='Investor or fund name')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD', help_text='ISO currency code')
+    funding_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='seed')
+    date_received = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='committed')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.source} — ${self.amount:,.0f}"
+
+    @property
+    def formatted_amount(self):
+        if self.amount >= 1_000_000:
+            return f"${self.amount / 1_000_000:.1f}M"
+        elif self.amount >= 1_000:
+            return f"${self.amount / 1_000:.0f}K"
+        return f"${self.amount:,.0f}"
+
+
+class KPI(models.Model):
+    PERIOD_CHOICES = [
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('annual', 'Annual'),
+    ]
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='kpis')
+    metric_name = models.CharField(max_length=255)
+    metric_value = models.DecimalField(max_digits=12, decimal_places=2)
+    target_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    period = models.CharField(max_length=20, choices=PERIOD_CHOICES, default='monthly')
+    unit = models.CharField(max_length=50, blank=True, help_text='e.g. users, revenue, %')
+    date_recorded = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.metric_name}: {self.metric_value} {self.unit}"
+
+    @property
+    def achievement_pct(self):
+        if self.target_value and self.target_value > 0:
+            return round((self.metric_value / self.target_value) * 100)
+        return None
+
+
+class PitchDeck(models.Model):
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='pitch_decks')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    file = models.FileField(upload_to='pitch_decks/', blank=True, null=True)
+    presentation_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+class ServiceOffered(models.Model):
+    CATEGORY_CHOICES = [
+        ('technology', 'Technology'),
+        ('consulting', 'Consulting'),
+        ('financial', 'Financial Services'),
+        ('marketing', 'Marketing'),
+        ('logistics', 'Logistics'),
+        ('education', 'Education'),
+        ('healthcare', 'Healthcare'),
+        ('agriculture', 'Agriculture'),
+        ('other', 'Other'),
+    ]
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='services')
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+
+    def __str__(self):
+        return self.name
+
+
+class UserProfile(models.Model):
+    USER_TYPE_CHOICES = [
+        ('admin', 'Admin'),
+        ('staff', 'Staff'),
+        ('mentor', 'Mentor'),
+        ('investor', 'Investor'),
+        ('individual', 'Individual Startup'),
+        ('public', 'Public Startup'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='public')
+    startup = models.ForeignKey(
+        'Startup', on_delete=models.CASCADE, null=True, blank=True, related_name='users'
+    )
+    company_name = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
+    avatar = models.ImageField(upload_to='users/avatars/', blank=True, null=True)
+    phone = models.CharField(max_length=30, blank=True)
+    company_website = models.URLField(blank=True)
+    registration_date = models.DateTimeField(auto_now_add=True)
+    last_login_ip = models.GenericIPAddressField(null=True, blank=True)
+    login_count = models.PositiveIntegerField(default=0)
+    is_email_verified = models.BooleanField(default=False)
+    verification_code = models.CharField(max_length=6, blank=True)
+    date_verified = models.DateTimeField(null=True, blank=True)
+    theme = models.CharField(
+        max_length=20,
+        choices=[('light', 'Light'), ('dark', 'Dark'), ('system', 'Use device setting')],
+        default='light',
+    )
+    email_notifications = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.get_user_type_display()})"
+
+    @property
+    def is_admin(self):
+        return self.user_type == 'admin'
+
+    @property
+    def is_staff_role(self):
+        return self.user_type in ['admin', 'staff']
+
+    @property
+    def is_startup(self):
+        return self.user_type in ['public', 'individual']
+
+    @property
+    def startup_name(self):
+        return self.startup.name if self.startup else self.company_name
+
+
+class RegistrationRate(models.Model):
+    """Tracks registration rates and statistics"""
+    DATE_CHOICES = [
+        ('today', 'Today'),
+        ('yesterday', 'Yesterday'),
+        ('this_week', 'This Week'),
+        ('this_month', 'This Month'),
+        ('all_time', 'All Time'),
+    ]
+
+    date_range = models.CharField(max_length=20, choices=DATE_CHOICES, default='all_time')
+    total_registrations = models.PositiveIntegerField(default=0)
+    new_today = models.PositiveIntegerField(default=0)
+    active_users_today = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Registration Rate"
+        verbose_name_plural = "Registration Rates"
+
+    def __str__(self):
+        return f"{self.get_date_range_display()}: {self.total_registrations} registrations"
+
+
+class ProfileView(models.Model):
+    """Tracks profile views for notification purposes"""
+    viewer = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='viewed_profiles'
+    )
+    viewed_profile_owner = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='profile_views_received'
+    )
+    startup = models.ForeignKey(
+        'Startup', on_delete=models.CASCADE, null=True, blank=True
+    )
+    viewed_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Profile View"
+        verbose_name_plural = "Profile Views"
+        ordering = ['-viewed_at']
+        unique_together = ['viewer', 'viewed_profile_owner', 'startup']
+
+    def __str__(self):
+        return f"{self.viewer.username} viewed {self.viewed_profile_owner.username}'s profile"
+
+
+class LoginNotification(models.Model):
+    """Tracks login notifications for admins"""
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='login_notifications'
+    )
+    ip_address = models.GenericIPAddressField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    startup_type = models.CharField(max_length=20, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Login Notification"
+        verbose_name_plural = "Login Notifications"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.user.username} logged in at {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+
+class SiteVisit(models.Model):
+    """Stores one current visitor record per browser session."""
+    session_key = models.CharField(max_length=40, unique=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='site_visits'
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    first_seen = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-last_seen']
+
+    def __str__(self):
+        return f"Visitor {self.session_key}"
+
+
+class PageVisit(models.Model):
+    """One visit per browser session, entity, and local calendar day."""
+    PAGE_TYPES = [
+        ('startup', 'Startup'),
+        ('mentor', 'Mentor'),
+        ('investor', 'Investor'),
+    ]
+
+    page_type = models.CharField(max_length=20, choices=PAGE_TYPES)
+    object_key = models.CharField(max_length=100)
+    display_name = models.CharField(max_length=255)
+    session_key = models.CharField(max_length=40)
+    visitor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tracked_page_visits'
+    )
+    visit_date = models.DateField()
+    visited_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-visited_at']
+        constraints = [models.UniqueConstraint(
+            fields=['page_type', 'object_key', 'session_key', 'visit_date'],
+            name='uniq_daily_entity_page_visit',
+        )]
+        indexes = [models.Index(fields=['page_type', 'visited_at'])]
+
+    def __str__(self):
+        return f'{self.get_page_type_display()} visit: {self.display_name}'
+
+
+class StartupStatusHistory(models.Model):
+    """Status snapshots recorded from this release onward; older history isn't inferred."""
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='status_history')
+    status = models.CharField(max_length=20, choices=Startup.STATUS_CHOICES)
+    contract_status = models.CharField(max_length=20, choices=Startup.CONTRACT_CHOICES, blank=True)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_at']
+        indexes = [models.Index(fields=['recorded_at', 'status'])]
+
+    def __str__(self):
+        return f'{self.startup}: {self.get_status_display()}'
+
+
+class ParticipantJourney(models.Model):
+    """Internal lifecycle record for a person moving through BUNI/DTBi support."""
+    STAGE_CHOICES = [
+        ('buni_community', 'BUNI community / outreach'),
+        ('buni_internship', 'BUNI internship'),
+        ('buni_mentoring', 'BUNI mentoring'),
+        ('buni_preincubation', 'BUNI pre-incubation'),
+        ('dtbi_preincubation', 'DTBi pre-incubation'),
+        ('dtbi_incubation', 'DTBi incubation'),
+        ('dtbi_growth', 'DTBi growth'),
+        ('alumni', 'Alumni / post-programme follow-up'),
+    ]
+    STATUS_CHOICES = [('active', 'Active'), ('paused', 'Paused'), ('completed', 'Completed'), ('exited', 'Exited')]
+
+    participant_name = models.CharField(max_length=255)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    startup = models.ForeignKey(Startup, on_delete=models.SET_NULL, null=True, blank=True, related_name='participant_journeys')
+    current_stage = models.CharField(max_length=30, choices=STAGE_CHOICES, default='buni_community')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    cohort = models.CharField(max_length=120, blank=True)
+    started_on = models.DateField(default=timezone.localdate)
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_participant_journeys')
+    internal_notes = models.TextField(blank=True, help_text='Internal programme notes. Do not enter sensitive personal data.')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', 'participant_name']
+        indexes = [models.Index(fields=['current_stage', 'status']), models.Index(fields=['cohort'])]
+
+    def __str__(self):
+        return f'{self.participant_name} — {self.get_current_stage_display()}'
+
+
+class ParticipantJourneyHistory(models.Model):
+    journey = models.ForeignKey(ParticipantJourney, on_delete=models.CASCADE, related_name='history')
+    old_stage = models.CharField(max_length=30, blank=True)
+    new_stage = models.CharField(max_length=30, choices=ParticipantJourney.STAGE_CHOICES)
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, choices=ParticipantJourney.STATUS_CHOICES)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='participant_journey_changes')
+    note = models.TextField(blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'{self.journey.participant_name}: {self.old_stage or "created"} → {self.new_stage}'
+
+
+class ParticipantSupport(models.Model):
+    SUPPORT_CHOICES = [
+        ('training', 'Training / capacity building'),
+        ('fabrication_lab', 'Fabrication lab / prototyping'),
+        ('business_advisory', 'Business advisory'),
+        ('market_access', 'Market access / procurement'),
+        ('finance_access', 'Finance / investor readiness'),
+        ('hub_linkage', 'Hub / ecosystem linkage'),
+        ('other', 'Other support'),
+    ]
+    journey = models.ForeignKey(ParticipantJourney, on_delete=models.CASCADE, related_name='support_deliveries')
+    support_type = models.CharField(max_length=30, choices=SUPPORT_CHOICES)
+    title = models.CharField(max_length=255)
+    delivered_on = models.DateField(default=timezone.localdate)
+    provider = models.CharField(max_length=255, blank=True, help_text='Team, partner, trainer, or facility')
+    hours = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_participant_support')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-delivered_on', '-created_at']
+
+    def __str__(self):
+        return f'{self.get_support_type_display()}: {self.title}'
+
+
+class ParticipantFollowUp(models.Model):
+    STATUS_CHOICES = [('open', 'Open'), ('in_progress', 'In progress'), ('done', 'Done'), ('cancelled', 'Cancelled')]
+    journey = models.ForeignKey(ParticipantJourney, on_delete=models.CASCADE, related_name='follow_ups')
+    action = models.CharField(max_length=255)
+    due_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='participant_follow_ups')
+    mentor = models.ForeignKey(Mentor, on_delete=models.SET_NULL, null=True, blank=True, related_name='participant_follow_ups')
+    mentor_session = models.ForeignKey(MentorEngagement, on_delete=models.SET_NULL, null=True, blank=True, related_name='participant_follow_ups')
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_participant_follow_ups')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['due_date', '-created_at']
+
+    def clean(self):
+        if self.mentor_session_id and self.journey_id:
+            session_startup_id = self.mentor_session.startup_id
+            if not self.journey.startup_id or session_startup_id != self.journey.startup_id:
+                raise ValidationError({'mentor_session': 'Choose a session linked to this participant’s startup.'})
+            if self.mentor_id and self.mentor_session.mentor_id != self.mentor_id:
+                raise ValidationError({'mentor': 'The selected mentor must match the linked session.'})
+
+    def __str__(self):
+        return f'{self.journey.participant_name}: {self.action}'
+
+
+class ParticipantFollowUpHistory(models.Model):
+    follow_up = models.ForeignKey(ParticipantFollowUp, on_delete=models.CASCADE, related_name='history')
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, choices=ParticipantFollowUp.STATUS_CHOICES)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='participant_follow_up_changes')
+    note = models.TextField(blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'{self.follow_up}: {self.old_status or "created"} → {self.new_status}'
+
+
+class ParticipantOutcome(models.Model):
+    journey = models.ForeignKey(ParticipantJourney, on_delete=models.CASCADE, related_name='outcomes')
+    recorded_on = models.DateField(default=timezone.localdate)
+    full_time_jobs = models.PositiveIntegerField(default=0)
+    part_time_jobs = models.PositiveIntegerField(default=0)
+    monthly_revenue = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    revenue_currency = models.CharField(max_length=3, default='TZS')
+    customers_or_users = models.PositiveIntegerField(null=True, blank=True)
+    milestone = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_participant_outcomes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_on', '-created_at']
+        indexes = [models.Index(fields=['recorded_on'])]
+
+    def clean(self):
+        if self.monthly_revenue is not None and self.monthly_revenue < 0:
+            raise ValidationError({'monthly_revenue': 'Monthly revenue cannot be negative.'})
+        if len(self.revenue_currency) != 3 or not self.revenue_currency.isalpha():
+            raise ValidationError({'revenue_currency': 'Use a three-letter currency code such as TZS or USD.'})
+        self.revenue_currency = self.revenue_currency.upper()
+
+    def __str__(self):
+        return f'{self.journey.participant_name}: outcomes on {self.recorded_on}'
+
+
+class DataImportBatch(models.Model):
+    DATASETS = [
+        ('startup', 'Startups'),
+        ('mentor', 'Mentors'),
+        ('investor', 'Investors'),
+        ('participant', 'Participant journeys'),
+    ]
+    STATUSES = [('preview', 'Ready to import'), ('completed', 'Completed'), ('failed', 'Failed')]
+
+    dataset = models.CharField(max_length=20, choices=DATASETS)
+    file = models.FileField(upload_to='imports/%Y/%m/', storage=PrivateImportStorage())
+    original_filename = models.CharField(max_length=255)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='data_imports')
+    status = models.CharField(max_length=20, choices=STATUSES, default='preview')
+    headers = models.JSONField(default=list, blank=True)
+    field_mapping = models.JSONField(default=dict, blank=True)
+    total_rows = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    updated_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    row_errors = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_dataset_display()} import: {self.original_filename}'
+
+
+class Partnership(models.Model):
+    TYPE_CHOICES = [
+        ('strategic', 'Strategic Partnership'),
+        ('technical', 'Technical Collaboration'),
+        ('distribution', 'Distribution Partnership'),
+        ('research', 'Research Collaboration'),
+        ('investment', 'Investment Partnership'),
+        ('funding', 'Funding and Co-investment'),
+        ('mentorship', 'Mentorship and Capacity Building'),
+        ('market_access', 'Market Access and Procurement'),
+        ('ecosystem_support', 'Ecosystem Services and Infrastructure'),
+        ('other', 'Other'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('on_hold', 'On Hold'),
+        ('rejected', 'Rejected'),
+        ('under_review', 'Under Review'),
+    ]
+
+    startup_name = models.CharField(max_length=255)
+    related_startup = models.ForeignKey(
+        Startup, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='partnership_requests',
+    )
+    contact_name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30, blank=True)
+    organization = models.CharField(max_length=255, blank=True)
+    partnership_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='strategic')
+    proposed_contribution = models.TextField(blank=True)
+    startup_benefit = models.TextField(blank=True)
+    expected_outcomes = models.TextField(blank=True)
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    assigned_to = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='assigned_partnerships',
+    )
+    review_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.startup_name} — {self.contact_name}"
+
+
+class PartnershipHistory(models.Model):
+    partnership = models.ForeignKey(Partnership, on_delete=models.CASCADE, related_name='history')
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20, choices=Partnership.STATUS_CHOICES)
+    changed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='partnership_status_changes',
+    )
+    note = models.TextField(blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f'{self.partnership}: {self.old_status or "submitted"} → {self.new_status}'

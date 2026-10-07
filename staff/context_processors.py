@@ -1,0 +1,32 @@
+from .models import Investor, Mentor, PageVisit, Partnership, Startup, UserProfile
+
+
+def people_counts(request):
+    return {
+        'live_counts': {
+            'startups': Startup.objects.filter(status='active', directory_visible=True).count(),
+            'mentors': Mentor.objects.filter(is_active=True).count(),
+            'investors': Investor.objects.filter(status='active').count(),
+        }
+    }
+
+
+def admin_page_visit_alerts(request):
+    unread = 0
+    user = getattr(request, 'user', None)
+    if user and user.is_authenticated:
+        if user.is_superuser or UserProfile.objects.filter(user=user, user_type='admin').exists():
+            unread = PageVisit.objects.filter(is_read=False).count()
+    incoming_messages = 0
+    if user and user.is_authenticated:
+        if user.is_superuser or UserProfile.objects.filter(user=user, user_type__in=('admin', 'staff')).exists():
+            incoming_messages = Partnership.objects.filter(status='pending').count()
+    return {'unread_page_visit_count': unread, 'incoming_message_count': incoming_messages}
+
+
+def user_theme(request):
+    user = getattr(request, 'user', None)
+    theme = 'light'
+    if user and user.is_authenticated:
+        theme = UserProfile.objects.filter(user=user).values_list('theme', flat=True).first() or 'light'
+    return {'ui_theme': theme}
