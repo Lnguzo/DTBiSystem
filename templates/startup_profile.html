@@ -41,8 +41,8 @@
 
 
 
-    .startup-story-cover { min-height:185px; margin:0 0 22px; padding:24px; display:flex; align-items:center; gap:18px; border-radius:18px; color:white; background:linear-gradient(120deg,#0d2d4b,#176c78); }
-    .startup-story-logo { width:70px; height:70px; flex:0 0 70px; display:grid; place-items:center; border-radius:17px; background:white; color:#176c78; font-size:1.5rem; }
+    .startup-story-cover { min-height:185px; margin:0 0 22px; padding:24px; display:flex; align-items:center; gap:18px; border-radius:18px; color:white; background:var(--grad-banner); }
+    .startup-story-logo { width:70px; height:70px; flex:0 0 70px; display:grid; place-items:center; border-radius:17px; background:white; color:var(--navy-600); font-size:1.5rem; }
     .startup-story-cover h2 { color:white; margin:4px 0; }
     .startup-impact-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin:16px 0; }
     .startup-impact-tile { padding:16px; border:1px solid var(--gray-200); border-radius:14px; background:#f7fafc; animation:startup-tile-in .55s both; }
@@ -486,7 +486,12 @@
                 </div>
                 <div class="form-group">
                     <label for="{{ form.startup_type.id_for_label }}">Type</label>
-                    {% if show_admin_fields %}{{ form.startup_type }}{% else %}<div class="form-input">{{ startup.get_startup_type_display|default:'Set from your account type' }}</div>{% endif %}
+                    {% if show_admin_fields or creating %}
+                        {{ form.startup_type }}
+                        {% if creating and not show_admin_fields %}<small class="form-help">Public startups are published immediately. Individual startups are submitted for review.</small>{% endif %}
+                    {% else %}
+                        <div class="form-input">{{ startup.get_startup_type_display|default:'Set from your account type' }}</div>
+                    {% endif %}
                 </div>
             </div>
             <div class="form-group">

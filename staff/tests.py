@@ -192,6 +192,40 @@ class StartupCreationTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, 'AgriTech Solutions')
 
+    def test_startup_creation_form_offers_type_choices(self):
+        self.profile.user_type = 'individual'
+        self.profile.save(update_fields=['user_type'])
+
+        response = self.client.get(reverse('staff:startup_create'))
+        self.assertContains(response, '<select name="startup_type"')
+        self.assertContains(response, '<option value="individual" selected>Individual startup</option>')
+        self.assertContains(response, '<option value="public">Public startup</option>')
+        self.assertContains(response, 'Public startups are published immediately.')
+
+    def test_individual_account_can_choose_public_startup(self):
+        self.profile.user_type = 'individual'
+        self.profile.save(update_fields=['user_type'])
+        payload = startup_payload()
+        payload['startup_type'] = 'public'
+
+        response = self.client.post(reverse('staff:startup_create'), payload)
+
+        self.assertEqual(response.status_code, 302)
+        startup = Startup.objects.get(name='AgriTech Solutions')
+        self.assertEqual(startup.startup_type, 'public')
+        self.assertEqual(startup.status, 'active')
+
+    def test_public_account_can_choose_individual_startup(self):
+        payload = startup_payload()
+        payload['startup_type'] = 'individual'
+
+        response = self.client.post(reverse('staff:startup_create'), payload)
+
+        self.assertEqual(response.status_code, 302)
+        startup = Startup.objects.get(name='AgriTech Solutions')
+        self.assertEqual(startup.startup_type, 'individual')
+        self.assertEqual(startup.status, 'pending')
+
     def test_form_errors_are_shown_when_founder_is_missing(self):
         payload = startup_payload()
         payload['founders-0-name'] = ''

@@ -75,6 +75,10 @@
   --grad-gold: linear-gradient(120deg, var(--gold-600) 0%, var(--gold-400) 50%, var(--gold-600) 100%);
   --grad-cta: linear-gradient(120deg, var(--navy-700) 0%, var(--navy-500) 60%, #2E7BFF 100%);
   --grad-surface: linear-gradient(180deg, #FFFFFF 0%, #F7FAFF 100%);
+  --grad-banner:
+    radial-gradient(90% 120% at 100% 0%, rgba(198, 162, 78, 0.35), transparent 55%),
+    radial-gradient(80% 100% at 0% 100%, rgba(76, 141, 246, 0.35), transparent 60%),
+    var(--grad-blue-deep);
 }
 
 /* --- Reset --- */
@@ -227,7 +231,12 @@ img { max-width: 100%; display: block; }
   .hero-mesh, .hero-orb, .aurora-band,
   .scroll-progress, .shimmer-sweep,
   .auth-intro, .auth-intro::after, .auth-intro h1 em,
-  .auth-eyebrow::after, .auth-submit::after { animation: none !important; }
+  .auth-eyebrow::after, .auth-submit::after,
+  .welcome-banner::before, .startup-story-cover,
+  .startup-story-cover::before, .directory-banner,
+  .directory-banner::before, .investor-profile-hero,
+  .investor-profile-hero::before, .mentor-profile-hero,
+  .mentor-profile-hero::before { animation: none !important; }
   .overview-hero-slideshow img { transition: none; }
   [data-reveal] { opacity: 1 !important; transform: none !important; filter: none !important; }
   * { scroll-behavior: auto !important; }
@@ -1065,14 +1074,21 @@ table tbody tr:last-child td { border-bottom: none; }
 
 /* --- Welcome Banner --- */
 .welcome-banner {
-  background:
-    radial-gradient(90% 120% at 100% 0%, rgba(198, 162, 78, 0.35), transparent 55%),
-    radial-gradient(80% 100% at 0% 100%, rgba(76, 141, 246, 0.35), transparent 60%),
-    var(--grad-blue-deep);
+  background: var(--grad-banner);
   border-radius: var(--radius-lg);
   padding: 30px 34px;
   color: var(--white);
   margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: banner-in 0.7s var(--ease-out) both;
+}
+
+.startup-story-cover,
+.directory-banner,
+.investor-profile-hero,
+.mentor-profile-hero {
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
@@ -1084,7 +1100,11 @@ table tbody tr:last-child td { border-bottom: none; }
   to { opacity: 1; transform: none; filter: none; }
 }
 
-.welcome-banner::before {
+.welcome-banner::before,
+.startup-story-cover::before,
+.directory-banner::before,
+.investor-profile-hero::before,
+.mentor-profile-hero::before {
   content: '';
   position: absolute;
   inset: -40%;
@@ -1093,7 +1113,11 @@ table tbody tr:last-child td { border-bottom: none; }
   pointer-events: none;
 }
 
-.welcome-banner::after {
+.welcome-banner::after,
+.startup-story-cover::after,
+.directory-banner::after,
+.investor-profile-hero::after,
+.mentor-profile-hero::after {
   content: '';
   position: absolute;
   right: -30px;
@@ -1120,6 +1144,22 @@ table tbody tr:last-child td { border-bottom: none; }
   font-size: 0.9rem;
   color: var(--navy-100);
   max-width: 520px;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-banner::after,
+.startup-story-cover::after,
+.directory-banner::after,
+.investor-profile-hero::after,
+.mentor-profile-hero::after {
+  pointer-events: none;
+}
+
+.startup-story-cover > *,
+.directory-banner > *,
+.investor-profile-hero > *,
+.mentor-profile-hero > * {
   position: relative;
   z-index: 1;
 }

@@ -752,7 +752,6 @@ def startup_create(request):
                 and pitch_formset.is_valid() and service_formset.is_valid()):
             with transaction.atomic():
                 startup = form.save(commit=False)
-                startup.startup_type = profile.user_type if profile.user_type in ('public', 'individual') else 'individual'
                 startup.status = 'pending' if startup.startup_type == 'individual' else 'active'
                 startup.save()
                 founder_formset.instance = startup
@@ -779,7 +778,9 @@ def startup_create(request):
             messages.success(request, f'{startup.name} has been added to the platform.')
             return redirect('staff:startup_profile', slug=startup.slug)
     else:
-        form = StartupOwnerForm()
+        form = StartupOwnerForm(initial={
+            'startup_type': profile.user_type if profile.user_type in ('public', 'individual') else 'individual',
+        })
         founder_formset = FounderFormSet(prefix='founders')
         opportunity_formset = OpportunityFormSet(prefix='opportunities')
         funding_formset = FundingFormSet(prefix='fundings')

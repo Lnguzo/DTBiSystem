@@ -8,7 +8,7 @@
 
 .yc-page {
   --yc-bleed: 28px;
-  --yc-bg: #f7f5ef;
+  --yc-bg: var(--page-bg);
   --yc-paper: #ffffff;
   --yc-ink: #131313;
   --yc-ink-2: #55524a;
