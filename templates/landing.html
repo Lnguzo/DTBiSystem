@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}BUNI &amp; DTBi — Innovation Ecosystem Overview{% endblock %}
+{% block page_title %}System Overview{% endblock %}
+
+{% block content %}
+<main class="overview-page">
+    <section class="overview-hero">
+        <div class="overview-hero-copy">
+            <div class="hero-mesh" aria-hidden="true"></div>
+            <span class="hero-orb hero-orb-a" aria-hidden="true"></span>
+            <span class="hero-orb hero-orb-b" aria-hidden="true"></span>
+            <span class="hero-orb hero-orb-c" aria-hidden="true"></span>
+            <div class="overview-hero-slideshow" aria-hidden="true">
+                <img class="is-active" src="{% static 'img/brands/staff.jpeg' %}" alt="">
+                <img src="{% static 'img/brands/staff1.jpeg' %}" alt="">
+                <img src="{% static 'img/brands/staff2.jpeg' %}" alt="">
+                <img src="{% static 'img/brands/staff3.jpeg' %}" alt="">
+            </div>
+            <div class="hero-grid" aria-hidden="true"></div>
+            <canvas class="ambient-field ambient-field-hero" aria-hidden="true"></canvas>
+            <div class="overview-hero-text">
+                <span class="overview-eyebrow hero-rise hero-rise-1"><i class="fas fa-sparkles"></i> BUNI &amp; DTBi innovation ecosystem</span>
+                <h1 class="hero-rise hero-rise-2">From early innovation to <span class="grad-gold-text">thriving ventures</span>.</h1>
+                <p class="hero-rise hero-rise-3">Connect early support and incubation with the people, partnerships, resources, and measurable outcomes that help ventures grow.</p>
+                <div class="overview-actions hero-rise hero-rise-4">
+                    <a href="{% url 'staff:register' %}" class="overview-primary-action">Get Started</a>
+                    <a href="{% url 'staff:user_login' %}" class="overview-secondary-action">Enter workspace</a>
+                    <a href="{% url 'staff:partnership_form' %}" class="overview-secondary-action">Partner with us</a>
+                </div>
+                <div class="hero-chips hero-rise hero-rise-5">
+                    <span class="hero-chip"><i class="fas fa-circle"></i> <b>{{ system_stats.startups|default:0 }}</b> startups</span>
+                    <span class="hero-chip"><i class="fas fa-circle"></i> <b>{{ system_stats.mentors|default:0 }}</b> mentors</span>
+                    <span class="hero-chip"><i class="fas fa-circle"></i> <b>{{ system_stats.investors|default:0 }}</b> investors</span>
+                    <span class="hero-chip"><i class="fas fa-circle"></i> live ecosystem data</span>
+                </div>
+            </div>
+            <div class="hero-ticker" aria-hidden="true">
+                <div class="hero-ticker-track">
+                    <span>Innovation pipelines</span><span>Mentorship sessions</span><span>Partnership deals</span><span>Funding tracked</span><span>Investor readiness</span><span>Opportunity board</span>
+                    <span>Innovation pipelines</span><span>Mentorship sessions</span><span>Partnership deals</span><span>Funding tracked</span><span>Investor readiness</span><span>Opportunity board</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="overview-search-section" data-reveal aria-label="Search the system overview">
+        <form method="get" class="overview-search-form">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="search" name="q" value="{{ search_query }}" placeholder="Search startups by name, industry, or description..." aria-label="Search startups">
+            <button type="submit">Search</button>
+        </form>
+    </section>
+
+    <section class="overview-section-head" data-reveal>
+        <div>
+            <span class="overview-kicker">Quick summary</span>
+            <h2>BUNI &amp; DTBi, in numbers</h2>
+        </div>
+        <span class="overview-updated"><i class="fas fa-circle"></i> Live from the system</span>
+    </section>
+
+    <section class="overview-stats-grid" data-stagger="110" aria-label="System statistics">
+        <article class="overview-stat-card">
+            <span class="overview-stat-icon"><i class="fas fa-rocket"></i></span>
+            <div><span class="overview-stat-label">Startups</span><strong>{{ system_stats.startups }}</strong><small>Published venture profiles</small></div>
+        </article>
+        <article class="overview-stat-card">
+            <span class="overview-stat-icon"><i class="fas fa-users"></i></span>
+            <div><span class="overview-stat-label">Mentors</span><strong>{{ system_stats.mentors }}</strong><small>Active BUNI mentors</small></div>
+        </article>
+        <article class="overview-stat-card">
+            <span class="overview-stat-icon"><i class="fas fa-handshake"></i></span>
+            <div><span class="overview-stat-label">Investors</span><strong>{{ system_stats.investors }}</strong><small>Active BUNI investors</small></div>
+        </article>
+        <article class="overview-stat-card">
+            <span class="overview-stat-icon"><i class="fas fa-coins"></i></span>
+            <div><span class="overview-stat-label">Funding records</span><strong>{{ system_stats.funding_records }}</strong><small>Committed or received entries</small></div>
+        </article>
+    </section>
+
+    {% if search_query %}
+    <section class="overview-results" data-reveal>
+        <div class="overview-section-head">
+            <div><span class="overview-kicker">Search results</span><h2>Matches for “{{ search_query }}”</h2></div>
+            <a href="{% url 'landing' %}" class="overview-clear-search">Clear search</a>
+        </div>
+        {% if startup_results %}
+        <div class="overview-result-list">
+            {% for startup in startup_results %}
+            <a class="overview-result" href="{% url 'staff:startup_profile' slug=startup.slug %}">
+                <span class="overview-result-avatar"><i class="fas fa-rocket"></i></span>
+                <span><strong>{{ startup.name }}</strong><small>{{ startup.industry|default:"Startup profile" }} · {{ startup.get_status_display }}</small></span>
+                <i class="fas fa-arrow-up-right-from-square"></i>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}<p class="overview-empty">No startup matched that search.</p>{% endif %}
+    </section>
+    {% endif %}
+
+    <section class="overview-section-head" id="upcoming-opportunities" data-reveal>
+        <div><span class="overview-kicker">What is happening</span><h2>Upcoming opportunities</h2><p>Open opportunities published by startups in the system.</p></div>
+        <a class="overview-clear-search" href="{% url 'staff:startups' %}">Explore startups</a>
+    </section>
+    <section class="overview-capability-grid" data-stagger="100" aria-label="Upcoming opportunities">
+        {% for opportunity in upcoming_opportunities %}
+        <article class="card"><span class="badge">{{ opportunity.get_opportunity_type_display }}</span><h3>{{ opportunity.title }}</h3><p>{{ opportunity.description|default:'Details are available in the startup profile.'|truncatechars:150 }}</p><p class="text-muted">{{ opportunity.startup.name }}{% if opportunity.deadline %} · Closes {{ opportunity.deadline|date:'d M Y' }}{% endif %}</p><a class="btn btn-outline btn-sm" href="{% url 'staff:startup_profile' slug=opportunity.startup.slug %}">More details</a></article>
+        {% empty %}<div class="overview-empty"><p>No live opportunities have been published yet.</p><a href="{% url 'hub_history' %}">Browse archived programme examples from the tracer study</a></div>{% endfor %}
+    </section>
+
+    <section class="overview-section" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin:28px 0">
+        <a href="{% url 'impact_explorer' %}" class="card" style="padding:22px;text-decoration:none;color:inherit"><span class="overview-kicker">For institutions and partners</span><h2>Explore annual impact</h2><p>Filter recorded support, startup cohorts, mentor sessions, outcomes, and jobs by year or venture.</p><strong>Open impact explorer</strong></a>
+        <a href="{% url 'hub_history' %}" class="card" style="padding:22px;text-decoration:none;color:inherit"><span class="overview-kicker">Since 2011</span><h2>BUNI &amp; DTBi history</h2><p>Learn about the programmes and ecosystem work that shaped Tanzania’s innovation community.</p><strong>Read the history</strong></a>
+    </section>
+
+    <section class="overview-capabilities">
+        <div class="overview-section-head"><div><span class="overview-kicker">What this system manages</span><h2>Built around real work</h2></div></div>
+        <div class="overview-capability-grid" data-reveal data-stagger="100">
+            <article><i class="fas fa-building"></i><h3>Startup profiles</h3><p>Keep company identity, incubation, contracts, and completion progress together.</p></article>
+            <article><i class="fas fa-chart-simple"></i><h3>Performance and funding</h3><p>Track KPIs, funding records, targets, and the evidence behind growth.</p></article>
+            <article><i class="fas fa-file-lines"></i><h3>Opportunity readiness</h3><p>Organize founders, services, pitch decks, and opportunities in one profile.</p></article>
+            <article><i class="fas fa-people-arrows"></i><h3>Partnerships</h3><p>Give partners a direct path to submit collaboration requests to the hub.</p></article>
+        </div>
+    </section>
+
+    <section class="visitor-pulse" data-reveal aria-label="Visitor activity">
+        <div class="visitor-pulse-heading"><span class="overview-kicker"><i class="fas fa-signal"></i> Visitor pulse</span><h2>People viewing the system</h2><p>Unique browser sessions recorded by the platform. Updated live.</p></div>
+        <div class="visitor-pulse-grid">
+            <div><strong data-visitor-count="total">{{ visitor_counts.total|default:0 }}</strong><span>Total visitors</span><small>Since launch</small></div>
+            <div><strong data-visitor-count="month">{{ visitor_counts.month|default:0 }}</strong><span>This month</span><small>Since the 1st</small></div>
+            <div><strong data-visitor-count="week">{{ visitor_counts.week|default:0 }}</strong><span>This week</span><small>From Monday this month</small></div>
+            <div><strong data-visitor-count="today">{{ visitor_counts.today|default:0 }}</strong><span>Today</span><small>Visitors today</small></div>
+        </div>
+    </section>
+</main>
+<script>
+    (function () {
+        const heroImages = document.querySelectorAll('.overview-hero-slideshow img');
+        if (heroImages.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            let activeImage = 0;
+            window.setInterval(function () {
+                heroImages[activeImage].classList.remove('is-active');
+                activeImage = (activeImage + 1) % heroImages.length;
+                heroImages[activeImage].classList.add('is-active');
+            }, 2500);
+        }
+
+        const countNodes = document.querySelectorAll('[data-visitor-count]');
+        const numberFormat = new Intl.NumberFormat();
+
+        function refreshVisitorPulse() {
+            fetch('{% url "staff:visitor_stats" %}', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(response => response.ok ? response.json() : Promise.reject(response.status))
+                .then(data => countNodes.forEach(node => {
+                    node.textContent = numberFormat.format(data[node.dataset.visitorCount] || 0);
+                }))
+                .catch(() => {});
+        }
+
+        refreshVisitorPulse();
+        window.setInterval(refreshVisitorPulse, 30000);
+    }());
+</script>
+{% endblock %}
