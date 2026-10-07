@@ -5,7 +5,11 @@
 {% block page_title %}Startups{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'style/startups-yc.css' %}?v=20261001-yc3">
+<link rel="stylesheet" href="{% static 'style/startups-yc.css' %}?v=20261007-yc4">
+<style>
+    .yc-page .yc-eyebrow::before { background: #000 !important; }
+    .yc-page .yc-hero-title sup { color: #000 !important; }
+</style>
 
 <div class="yc-page">
 
@@ -288,5 +292,4 @@
     pan();
 }());
 </script>
-{% endblock %}
 {% endblock %}

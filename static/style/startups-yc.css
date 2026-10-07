@@ -61,7 +61,7 @@
   content: '';
   width: 10px;
   height: 10px;
-  background: var(--yc-accent);
+  background: #000;
   border-radius: 2px;
 }
 
@@ -156,7 +156,7 @@
 
 .yc-hero-title sup {
   font-size: 0.32em;
-  color: var(--yc-accent);
+  color: #000;
   top: -1.35em;
   font-weight: 600;
 }

@@ -106,7 +106,7 @@
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Upcoming Mentor Sessions</h3>
-            <button class="btn btn-sm btn-gold"><i class="fas fa-plus"></i> New</button>
+            {% if user.profile.is_staff_role %}<a class="btn btn-sm btn-gold" href="{% url 'staff:mentor_sessions' %}#arrange-session"><i class="fas fa-plus"></i> New</a>{% endif %}
         </div>
         <div class="card-body flush">
             <div class="table-wrap">

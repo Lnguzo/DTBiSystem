@@ -361,6 +361,21 @@ class StaffLandingPageTests(TestCase):
         response = self.client.get(reverse('staff:dashboard'))
         self.assertContains(response, reverse('staff:staff_home'))
 
+    def test_new_session_button_opens_the_scheduler(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse('staff:dashboard'))
+        scheduler_url = f"{reverse('staff:mentor_sessions')}#arrange-session"
+        self.assertContains(response, f'href="{scheduler_url}"')
+
+        scheduler_response = self.client.get(reverse('staff:mentor_sessions'))
+        self.assertContains(scheduler_response, 'id="arrange-session"')
+        self.assertContains(scheduler_response, 'Arrange a session')
+
+    def test_new_session_button_is_not_shown_to_non_staff(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('staff:dashboard'))
+        self.assertNotContains(response, '> New</a>')
+
 
 class StaffStartupControlTests(TestCase):
 
