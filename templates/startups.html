@@ -114,10 +114,11 @@
             </div>
         </div>
 
+        {% if search_query or industry_filter or status_filter or filter_type %}
         <div class="yc-countline">
-            <span>{% if search_query or industry_filter or status_filter or filter_type %}Showing <strong>{{ page_obj.paginator.count }}</strong> startups matching your filters.{% else %}<strong>{{ page_obj.paginator.count }}</strong> startups in the directory.{% endif %}</span>
-            {% if search_query or industry_filter or status_filter or filter_type %}<a class="yc-clear" href="{% url 'staff:startups' %}"><i class="fas fa-xmark"></i> Clear filters</a>{% endif %}
+            <a class="yc-clear" href="{% url 'staff:startups' %}"><i class="fas fa-xmark"></i> Clear filters</a>
         </div>
+        {% endif %}
 
         <div class="yc-grid" data-stagger="55">
             {% for s in startup_list %}
