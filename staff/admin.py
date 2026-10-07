@@ -7,7 +7,7 @@ from .models import (
     Partnership, PartnershipHistory, Startup, StartupStatusHistory, UserProfile,
     ParticipantJourney, ParticipantJourneyHistory, ParticipantSupport,
     ParticipantFollowUp, ParticipantFollowUpHistory, ParticipantOutcome,
-    StartupPublicSection, StartupStorySlide, StartupTeamMember,
+    StartupInquiry, StartupPublicSection, StartupStorySlide, StartupTeamMember,
 )
 
 
@@ -285,3 +285,12 @@ class StartupTeamMemberAdmin(admin.ModelAdmin):
     list_filter = ('startup', 'title')
     search_fields = ('startup__name', 'name', 'title', 'bio')
     list_editable = ('sort_order',)
+
+
+@admin.register(StartupInquiry)
+class StartupInquiryAdmin(admin.ModelAdmin):
+    list_display = ('startup', 'inquiry_type', 'subject', 'sender_name', 'organization', 'status', 'created_at')
+    list_filter = ('startup', 'inquiry_type', 'status', 'created_at')
+    search_fields = ('startup__name', 'subject', 'sender_name', 'organization', 'sender_email', 'message')
+    readonly_fields = ('created_at',)
+    list_editable = ('status',)

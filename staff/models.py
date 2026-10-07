@@ -234,6 +234,9 @@ class MentorEngagementHistory(models.Model):
 
 class Opportunity(models.Model):
     TYPE_CHOICES = [
+        ('job', 'Job or Internship'),
+        ('event', 'Event Invitation'),
+        ('collaboration', 'Collaboration'),
         ('funding', 'Funding'),
         ('mentorship', 'Mentorship'),
         ('partnership', 'Partnership'),
@@ -849,3 +852,41 @@ class StartupTeamMember(models.Model):
 
     def __str__(self):
         return f'{self.name} - {self.startup.name}'
+
+
+class StartupInquiry(models.Model):
+    """A private message or opportunity submitted to a startup profile."""
+
+    TYPE_CHOICES = [
+        ('job_offer', 'Job or Internship Opportunity'),
+        ('collaboration', 'Collaboration or Partnership'),
+        ('event', 'Event Invitation'),
+        ('funding', 'Funding or Investment'),
+        ('mentorship', 'Mentorship or Training'),
+        ('product_demo', 'Product Demo or School Visit'),
+        ('other', 'Other Opportunity'),
+    ]
+    STATUS_CHOICES = [
+        ('new', 'New'),
+        ('reviewed', 'Reviewed'),
+        ('contacted', 'Contacted'),
+        ('closed', 'Closed'),
+    ]
+
+    startup = models.ForeignKey(Startup, on_delete=models.CASCADE, related_name='inquiries')
+    inquiry_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    sender_name = models.CharField(max_length=150)
+    organization = models.CharField(max_length=200, blank=True)
+    sender_email = models.EmailField()
+    phone = models.CharField(max_length=50, blank=True)
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['startup', 'status', 'created_at'])]
+
+    def __str__(self):
+        return f'{self.get_inquiry_type_display()} for {self.startup.name}: {self.subject}'

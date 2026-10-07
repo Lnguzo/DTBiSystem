@@ -8,6 +8,7 @@ from .models import (
     KPI, PitchDeck, ServiceOffered, Partnership, UserProfile, Mentor, Investor,
     MentorEngagement, ParticipantJourney, ParticipantSupport, ParticipantFollowUp,
     ParticipantOutcome,
+    StartupInquiry,
 )
 
 
@@ -141,6 +142,37 @@ OpportunityFormSet = forms.inlineformset_factory(
     Startup, Opportunity, form=OpportunityForm,
     extra=1, can_delete=True
 )
+
+
+class StartupInquiryForm(forms.ModelForm):
+    fax_number = forms.CharField(required=False, widget=forms.HiddenInput)
+    message = forms.CharField(
+        max_length=5000,
+        widget=forms.Textarea(attrs={
+            'class': 'form-textarea', 'rows': 4,
+            'placeholder': 'Describe the opportunity, timing, and how SmartDarasa can follow up.',
+        }),
+    )
+
+    class Meta:
+        model = StartupInquiry
+        fields = [
+            'inquiry_type', 'sender_name', 'organization', 'sender_email',
+            'phone', 'subject', 'message',
+        ]
+        widgets = {
+            'inquiry_type': forms.Select(attrs={'class': 'form-select'}),
+            'sender_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'organization': forms.TextInput(attrs={'class': 'form-input'}),
+            'sender_email': forms.EmailInput(attrs={'class': 'form-input'}),
+            'phone': forms.TextInput(attrs={'class': 'form-input'}),
+            'subject': forms.TextInput(attrs={'class': 'form-input'}),
+        }
+
+    def clean_fax_number(self):
+        if self.cleaned_data.get('fax_number'):
+            raise forms.ValidationError('Unable to submit this message.')
+        return ''
 
 
 class FundingForm(forms.ModelForm):

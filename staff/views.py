@@ -22,14 +22,14 @@ from django.http import Http404, HttpResponse, JsonResponse
 from .models import (
     Startup, Founder, Opportunity, Funding,
     KPI, PitchDeck, ServiceOffered, Partnership, PartnershipHistory,
-    UserProfile, RegistrationRate, ProfileView, LoginNotification, SiteVisit, PageVisit,
+    UserProfile, RegistrationRate, ProfileView, LoginNotification, SiteVisit, PageVisit, StartupInquiry,
     Mentor, Investor
 )
 from .forms import (
     StartupForm, StartupOwnerForm, FounderFormSet, OpportunityFormSet,
     FundingFormSet, KPIFormSet, PitchDeckFormSet,
     ServiceOfferedFormSet, PartnershipForm, AccountForm,
-    ProfilePreferencesForm, MentorForm, InvestorForm, ManagedUserForm,
+    ProfilePreferencesForm, MentorForm, InvestorForm, ManagedUserForm, StartupInquiryForm,
 )
 from .data_views import record_page_visit
 
@@ -906,7 +906,17 @@ def startup_profile(request, slug):
         raise Http404
     profile = get_profile(request.user) if authenticated else None
     more_login_url = f"{reverse('staff:user_login')}?{urlencode({'next': request.get_full_path()})}"
-    if request.method == 'POST' and not authenticated:
+    is_inquiry_submission = request.method == 'POST' and request.POST.get('form_type') == 'startup_inquiry'
+    inquiry_form = StartupInquiryForm()
+    if is_inquiry_submission:
+        inquiry_form = StartupInquiryForm(request.POST)
+        if inquiry_form.is_valid():
+            inquiry = inquiry_form.save(commit=False)
+            inquiry.startup = startup
+            inquiry.save()
+            messages.success(request, f'Your message has been sent to {startup.name}.')
+            return redirect(f"{reverse('staff:startup_profile', kwargs={'slug': startup.slug})}?inquiry_sent=1#startup-details")
+    elif request.method == 'POST' and not authenticated:
         return redirect(more_login_url)
 
     # Only the owner of the startup (or a hub admin) may change it.
@@ -916,7 +926,7 @@ def startup_profile(request, slug):
         return redirect(f"{reverse('staff:user_login')}?next={request.get_full_path()}")
     can_view_mentor_sessions = bool(profile and (profile.is_admin or profile.is_staff_role or profile.startup_id == startup.id))
 
-    if request.method == 'POST':
+    if request.method == 'POST' and not is_inquiry_submission:
         if not can_edit:
             messages.error(request, 'You can only edit your own startup profile.')
             return redirect('staff:startup_profile', slug=startup.slug)
@@ -964,6 +974,9 @@ def startup_profile(request, slug):
         'startup_public_sections': startup.public_sections.all(),
         'startup_story_slides': startup.story_slides.all(),
         'startup_team_members': startup.team_members.all(),
+        'startup_live_opportunities': startup.opportunities.filter(status='open').order_by('deadline', 'title'),
+        'startup_inquiries': startup.inquiries.all() if can_view_private else (),
+        'inquiry_form': inquiry_form,
         'form': form,
         'founder_formset': founder_formset,
         'opportunity_formset': opportunity_formset,
