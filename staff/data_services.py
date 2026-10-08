@@ -1,9 +1,15 @@
 import csv
+from bisect import bisect_right
+from difflib import SequenceMatcher
+import os
+import shutil
+import statistics
 import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Sum
@@ -20,7 +26,7 @@ from .models import (
 
 IMPORT_MODELS = {'startup': Startup, 'mentor': Mentor, 'investor': Investor, 'participant': ParticipantJourney}
 IMPORT_FIELDS = {
-    'startup': ('name', 'startup_type', 'description', 'industry', 'website', 'contact_email', 'phone', 'source', 'status', 'contract_status', 'founded_date', 'incubation_start', 'incubation_end', 'year_incubated'),
+    'startup': ('name', 'startup_type', 'description', 'industry', 'website', 'contact_email', 'phone', 'contact_person', 'contact_address', 'source', 'status', 'contract_status', 'founded_date', 'incubation_start', 'incubation_end', 'year_incubated'),
     'mentor': ('name', 'email', 'gender', 'education_level', 'phone', 'role', 'skills', 'training_topics', 'is_active', 'source'),
     'investor': ('name', 'organization', 'email', 'phone', 'website', 'description', 'investment_interest', 'status', 'source'),
     'participant': ('participant_name', 'email', 'phone', 'startup', 'current_stage', 'status', 'cohort', 'started_on'),
@@ -35,10 +41,12 @@ ALIASES = {
     'organization': ('organization', 'organisation', 'company', 'company name', 'fund'),
     'email': ('email', 'email address', 'contact email'),
     'contact_email': ('contact email', 'email', 'email address'),
+    'contact_person': ('contact person', 'contact name', 'primary contact', 'contact person name', 'founder'),
+    'contact_address': ('contact address', 'address', 'business address', 'postal address'),
     'industry': ('industry', 'sector'),
-    'website': ('website', 'url', 'web address'),
+    'website': ('website', 'url', 'web address', 'website and links', 'website links'),
     'phone': ('phone', 'telephone', 'mobile', 'contact number'),
-    'description': ('description', 'profile', 'about', 'summary'),
+    'description': ('description', 'profile', 'about', 'summary', 'business description'),
     'status': ('status', 'startup status', 'investor status'),
     'startup_type': ('startup type', 'type'),
     'contract_status': ('contract status', 'contract'),
@@ -46,6 +54,14 @@ ALIASES = {
     'incubation_start': ('incubation start', 'programme start', 'program start'),
     'incubation_end': ('incubation end', 'programme end', 'program end'),
     'year_incubated': ('year incubated', 'cohort year', 'incubation year'),
+    'founder and startup name': ('founder and startup name', 'founder startup name'),
+    'employment created': ('employment created', 'jobs created', 'employees'),
+    'product service offered': ('product service offered', 'product offered', 'service offered', 'products and services'),
+    'years of operation': ('years of operation', 'years operating', 'years in operation'),
+    'investment raised': ('investment raised', 'funding raised', 'capital raised'),
+    'business description': ('business description', 'company description'),
+    'link to buni hub dtbi': ('link to buni hub dtbi', 'buni hub dtbi link'),
+    'website and links': ('website and links', 'website links', 'website and link'),
     'gender': ('gender',),
     'education_level': ('education', 'education level', 'qualification'),
     'role': ('role', 'mentor role', 'describe yourself'),
@@ -61,8 +77,334 @@ def _normalize(value):
     return re.sub(r'[^a-z0-9]+', ' ', str(value or '').strip().lower()).strip()
 
 
-def read_import_file(path):
-    """Return column headings and non-empty rows for CSV, XLSX, or tabular PDF."""
+def _pdf_page_rows(page, dataset=None):
+    table_sets = [
+        page.extract_tables(),
+        page.extract_tables(table_settings={
+            'vertical_strategy': 'text',
+            'horizontal_strategy': 'text',
+            'min_words_vertical': 2,
+            'min_words_horizontal': 1,
+            'text_x_tolerance': 2,
+            'text_y_tolerance': 3,
+        }),
+    ]
+    candidates = []
+    for tables in table_sets:
+        for table in tables or []:
+            cleaned = [
+                [re.sub(r'\s+', ' ', str(cell or '')).strip() for cell in row]
+                for row in table if row and any(str(cell or '').strip() for cell in row)
+            ]
+            if len(cleaned) >= 2:
+                populated_rows = sum(sum(bool(cell) for cell in row) >= 2 for row in cleaned)
+                column_count = max((len(row) for row in cleaned), default=0)
+                if dataset in IMPORT_FIELDS:
+                    attribute_rows = _pdf_attribute_rows(cleaned, dataset)
+                    attribute_values = sum(bool(value) for value in attribute_rows[1]) if attribute_rows else 0
+                    mapped_headers = len(guess_field_mapping(
+                        dataset, [str(value or '') for value in cleaned[0]]
+                    ))
+                    candidates.append((
+                        attribute_values, mapped_headers, populated_rows, -column_count, cleaned,
+                    ))
+                else:
+                    candidates.append((populated_rows, column_count, cleaned))
+    if not candidates:
+        return []
+    if dataset in IMPORT_FIELDS:
+        rows = max(candidates, key=lambda item: item[:4])[4]
+    else:
+        _populated_rows, _column_count, rows = max(candidates, key=lambda item: (item[0], item[1]))
+    return rows
+
+
+def _pdf_attribute_rows(rows, dataset):
+    label_to_field = {}
+    for field in IMPORT_FIELDS[dataset]:
+        labels = set(ALIASES.get(field, (field.replace('_', ' '),)))
+        labels.add(IMPORT_MODELS[dataset]._meta.get_field(field).verbose_name)
+        for label in labels:
+            label_to_field[_normalize(label)] = field
+    label_to_field[_normalize('business description')] = 'description'
+    label_to_field[_normalize('website and links')] = 'website'
+
+    values = {}
+    description_parts = []
+    recognized = 0
+    recognized_header_rows = 0
+    for index in range(0, len(rows) - 1, 2):
+        labels, row_values = rows[index], rows[index + 1]
+        recognized_in_row = 0
+        for column, raw_label in enumerate(labels):
+            label = _normalize(raw_label)
+            value = re.sub(r'\s+', ' ', str(row_values[column] or '').strip()) if column < len(row_values) else ''
+            if not label or not value:
+                continue
+
+            if label in {'founder and startup name', 'founder startup name'}:
+                recognized += 1
+                recognized_in_row += 1
+                names = re.split(r'\s+(?:[�–—|/]|-)\s+', value, maxsplit=1)
+                if len(names) == 2:
+                    values['contact_person'] = names[0].strip()
+                    values['name'] = names[1].strip()
+                else:
+                    values['name'] = value
+                continue
+
+            field = label_to_field.get(label)
+            if field:
+                recognized += 1
+                recognized_in_row += 1
+                if field == 'description':
+                    description_parts.append(value)
+                else:
+                    values[field] = re.sub(r'\s+', '', value) if field == 'website' else value
+                continue
+
+            metadata_labels = {
+                'employment created': 'Employment created',
+                'years of operation': 'Years of operation',
+                'investment raised': 'Investment raised',
+                'product service offered': 'Product or service offered',
+                'link to buni hub dtbi': 'BUNI Hub / DTBi link',
+            }
+            metadata_name = next(
+                (display for key, display in metadata_labels.items() if label in {
+                    _normalize(key),
+                    *(_normalize(alias) for alias in ALIASES.get(key, ())),
+                }),
+                None,
+            )
+            if metadata_name:
+                recognized += 1
+                recognized_in_row += 1
+                description_parts.append(f'{metadata_name}: {value}')
+        if recognized_in_row >= 2:
+            recognized_header_rows += 1
+
+    if recognized < 2 or not recognized_header_rows:
+        return []
+    if description_parts:
+        values['description'] = '\n'.join(description_parts)
+
+    fields = list(IMPORT_FIELDS[dataset])
+    headers = [IMPORT_MODELS[dataset]._meta.get_field(field).verbose_name.title() for field in fields]
+    return [headers, [values.get(field, '') for field in fields]]
+
+
+def _pdf_labeled_rows(text, dataset):
+    fields_by_label = {}
+    for field in IMPORT_FIELDS[dataset]:
+        labels = set(ALIASES.get(field, (field.replace('_', ' '),)))
+        labels.add(IMPORT_MODELS[dataset]._meta.get_field(field).verbose_name)
+        for label in labels:
+            normalized = _normalize(label)
+            if normalized:
+                fields_by_label[normalized] = field
+    labels = sorted(fields_by_label, key=len, reverse=True)
+    labeled_line = re.compile(r'^\s*(.*?)\s*(?::|：|[-–—])\s*(.*?)\s*$')
+    records = []
+    current = {}
+    pending_field = None
+
+    def save_record():
+        nonlocal current
+        if current.get('name') or current.get('participant_name'):
+            records.append(current)
+        current = {}
+
+    for raw_line in text.splitlines():
+        line = re.sub(r'\s+', ' ', raw_line).strip()
+        if not line:
+            pending_field = None
+            continue
+
+        match = labeled_line.match(line)
+        field = None
+        value = ''
+        if match:
+            field = fields_by_label.get(_normalize(match.group(1)))
+            value = match.group(2).strip()
+        if field is None:
+            for label in labels:
+                label_pattern = r'\s+'.join(re.escape(part) for part in label.split())
+                match = re.match(
+                    rf'^\s*{label_pattern}\b\s*(?::|：|[-–—])?\s+(.+?)\s*$',
+                    line,
+                    flags=re.IGNORECASE,
+                )
+                if match:
+                    field = fields_by_label[label]
+                    value = match.group(1).strip()
+                    break
+        if field is None:
+            words = line.split()
+            best_match = None
+            for label in labels:
+                label_word_count = len(label.split())
+                if len(words) <= label_word_count:
+                    continue
+                prefix = _normalize(' '.join(words[:label_word_count]))
+                if not prefix:
+                    continue
+                similarity = SequenceMatcher(None, prefix, label).ratio()
+                if similarity >= 0.82 and (
+                    best_match is None
+                    or (label_word_count, similarity) > (best_match[0], best_match[1])
+                ):
+                    best_match = (label_word_count, similarity, label, ' '.join(words[label_word_count:]))
+            if best_match:
+                _label_word_count, _similarity, label, value = best_match
+                field = fields_by_label[label]
+        if field is None:
+            normalized_line = _normalize(line)
+            field = fields_by_label.get(normalized_line)
+            if field:
+                pending_field = field
+                continue
+            if pending_field:
+                field, value = pending_field, line
+                pending_field = None
+            else:
+                continue
+
+        if field in {'name', 'participant_name'} and current.get(field):
+            save_record()
+        if value:
+            current[field] = f"{current[field]} {value}".strip() if field == 'description' and current.get(field) else value
+        pending_field = None
+
+    save_record()
+    if not records:
+        return []
+
+    fields = list(IMPORT_FIELDS[dataset])
+    headers = [IMPORT_MODELS[dataset]._meta.get_field(field).verbose_name.title() for field in fields]
+    return [headers] + [
+        [record.get(field, '') for field in fields]
+        for record in records
+    ]
+
+
+def _pdf_rows_match_dataset(rows, dataset):
+    if not rows:
+        return False
+    headers = [str(value or '').strip() for value in rows[0]]
+    known_labels = {
+        _normalize(alias)
+        for field in IMPORT_FIELDS[dataset]
+        for alias in ALIASES.get(field, (field.replace('_', ' '),))
+    }
+    for header in headers:
+        match = re.match(r'^\s*(.*?)\s*(?::|：)\s*(.*?)\s*$', header)
+        if match and _normalize(match.group(1)) in known_labels:
+            return False
+        if _normalize(header.rstrip(':：')) in known_labels and header.endswith((':', '：')):
+            return False
+    return bool(guess_field_mapping(dataset, headers))
+
+
+def _ocr_pdf_page(page, dataset=None):
+    try:
+        import pytesseract
+        from pytesseract import Output
+    except ImportError as exc:
+        raise ValidationError(
+            'Scanned PDF OCR requires pytesseract. Install the project requirements and restart the app.'
+        ) from exc
+
+    tesseract_cmd = settings.TESSERACT_CMD or shutil.which('tesseract')
+    if not tesseract_cmd and os.name == 'nt':
+        installed_cmd = Path(os.environ.get('ProgramFiles', r'C:\Program Files')) / 'Tesseract-OCR' / 'tesseract.exe'
+        if installed_cmd.is_file():
+            tesseract_cmd = str(installed_cmd)
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = str(tesseract_cmd)
+
+    try:
+        image = page.to_image(resolution=300).original
+        data = pytesseract.image_to_data(
+            image, lang=settings.TESSERACT_LANG, config='--psm 6', output_type=Output.DICT,
+        )
+    except pytesseract.pytesseract.TesseractNotFoundError as exc:
+        raise ValidationError(
+            'Tesseract OCR is not installed or not on the app PATH. Install the free Tesseract OCR engine '
+            'or set TESSERACT_CMD to the full path of tesseract.exe, then restart the app.'
+        ) from exc
+    except pytesseract.TesseractError as exc:
+        raise ValidationError(f'OCR could not process this PDF page: {exc}') from exc
+
+    grouped_words = {}
+    for index, text in enumerate(data['text']):
+        word = text.strip()
+        if not word:
+            continue
+        key = (data['block_num'][index], data['par_num'][index], data['line_num'][index])
+        grouped_words.setdefault(key, []).append((
+            data['left'][index], data['top'][index], data['height'][index],
+            data['width'][index], word,
+        ))
+
+    line_groups = []
+    ocr_lines = []
+    for words in sorted(grouped_words.values(), key=lambda line: min(word[1] for word in line)):
+        words.sort(key=lambda word: word[0])
+        heights = [word[2] for word in words if word[2] > 0]
+        gap_threshold = max(24, statistics.median(heights) * 1.5) if heights else 24
+        cells = []
+        cell_words = []
+        previous_right = None
+        cell_bounds = []
+        for left, _top, _height, width, word in words:
+            if previous_right is not None and left - previous_right > gap_threshold:
+                cells.append(' '.join(cell_words))
+                cell_bounds.append((cell_left, previous_right))
+                cell_words = []
+            if not cell_words:
+                cell_left = left
+            cell_words.append(word)
+            previous_right = left + width
+        if cell_words:
+            cells.append(' '.join(cell_words))
+            cell_bounds.append((cell_left, previous_right))
+        ocr_lines.append(' '.join(word[4] for word in words))
+        line_groups.append((min(word[1] for word in words), words, cells, cell_bounds))
+
+    if dataset in IMPORT_FIELDS:
+        header_candidates = [
+            (len(guess_field_mapping(dataset, cells)), index)
+            for index, (_top, _words, cells, _bounds) in enumerate(line_groups)
+            if len(cells) > 1 and len(guess_field_mapping(dataset, cells)) > 1
+        ]
+        if header_candidates:
+            _score, header_index = max(header_candidates)
+            header_top, _header_words, headers, header_bounds = line_groups[header_index]
+            boundaries = [
+                (header_bounds[index][1] + header_bounds[index + 1][0]) / 2
+                for index in range(len(header_bounds) - 1)
+            ]
+            rows = [headers]
+            for line_top, words, _cells, _bounds in line_groups:
+                if line_top <= header_top:
+                    continue
+                values = ['' for _header in headers]
+                for left, _top, _height, _width, word in words:
+                    column = bisect_right(boundaries, left)
+                    values[column] = f'{values[column]} {word}'.strip()
+                values = [re.sub(r'^[\s:=|]+|[\s:=|]+$', '', value) for value in values]
+                if any(values):
+                    rows.append(values)
+            return '\n'.join(ocr_lines), rows
+
+    return '\n'.join(ocr_lines), [
+        cells for _top, _words, cells, _bounds in line_groups if len(cells) > 1
+    ]
+
+
+def read_import_file(path, dataset=None):
+    """Return column headings and non-empty rows for CSV, XLSX, or text-table PDF."""
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == '.csv':
@@ -89,9 +431,21 @@ def read_import_file(path):
         rows = []
         with pdfplumber.open(path) as pdf:
             for page in pdf.pages:
-                rows.extend(row for table in (page.extract_tables() or []) for row in table if row)
+                page_rows = _pdf_page_rows(page, dataset)
+                page_text = page.extract_text() or ''
+                if not page_text.strip():
+                    page_text, ocr_rows = _ocr_pdf_page(page, dataset)
+                    if dataset in IMPORT_FIELDS and _pdf_rows_match_dataset(ocr_rows, dataset):
+                        page_rows = ocr_rows
+                    else:
+                        page_rows = []
+                if dataset in IMPORT_FIELDS and not _pdf_rows_match_dataset(page_rows, dataset):
+                    page_rows = _pdf_attribute_rows(page_rows, dataset) or _pdf_labeled_rows(page_text, dataset)
+                rows.extend(page_rows)
         if not rows:
-            raise ValidationError('No tables could be read from this PDF. Use a text based PDF with a clear table, or convert it to Excel/CSV.')
+            raise ValidationError(
+                'No readable text or table was found in this PDF. Scanned/image-only PDFs need OCR before importing.'
+            )
     else:
         raise ValidationError('Upload an .xlsx, .csv, or table based .pdf file.')
 
@@ -101,9 +455,15 @@ def read_import_file(path):
     headers = [str(value or '').strip() for value in rows[0]]
     if not any(headers):
         raise ValidationError('The first row must contain column headings.')
+    normalized_headers = tuple(_normalize(header) for header in headers)
     records = []
     for row in rows[1:20001]:
-        records.append({headers[index]: value for index, value in enumerate(row) if index < len(headers) and headers[index]})
+        if tuple(_normalize(value) for value in row[:len(headers)]) == normalized_headers:
+            continue
+        records.append({
+            headers[index]: value for index, value in enumerate(row)
+            if index < len(headers) and headers[index]
+        })
     if not records:
         raise ValidationError('No data rows were found.')
     return headers, records
@@ -120,7 +480,7 @@ def guess_field_mapping(dataset, headers):
     return mapping
 
 
-def _value_for_field(raw, field):
+def _value_for_field(raw, field, dataset=None):
     if raw is None:
         return None
     if isinstance(raw, str):
@@ -159,6 +519,15 @@ def _value_for_field(raw, field):
         if choice:
             return choice
         raise ValidationError(f'Unknown {field.replace("_", " ")}: {raw}')
+    if dataset in IMPORT_MODELS:
+        choices = IMPORT_MODELS[dataset]._meta.get_field(field).choices
+        if choices:
+            normalized_choices = {_normalize(label): key for key, label in choices}
+            normalized_choices.update({_normalize(key): key for key, _label in choices})
+            choice = normalized_choices.get(_normalize(raw))
+            if choice is None:
+                raise ValidationError(f'Unknown {field.replace("_", " ")}: {raw}')
+            return choice
     return str(raw).strip()
 
 
@@ -217,9 +586,9 @@ def _resolve_import_values(dataset, values):
     return values
 
 
-def analyze_import_preview(batch, mapping):
+def analyze_import_preview(batch, mapping, field_values=None):
     """Validate mapped rows without saving and classify likely creates/updates."""
-    headers, rows = read_import_file(batch.file.path)
+    headers, rows = read_import_file(batch.file.path, batch.dataset)
     if batch.dataset == 'mentor':
         normalized = {_normalize(header): header for header in headers}
         first_header, last_header = normalized.get('first name'), normalized.get('last name')
@@ -243,7 +612,10 @@ def analyze_import_preview(batch, mapping):
     for line, row in enumerate(rows, start=2):
         try:
             values = {field: value for field, header in selected.items()
-                      if (value := _value_for_field(row.get(header), field)) is not None}
+                      if (value := _value_for_field(row.get(header), field, batch.dataset)) is not None}
+            for field, raw_value in (field_values or {}).items():
+                if field in IMPORT_FIELDS[batch.dataset] and raw_value not in (None, ''):
+                    values[field] = _value_for_field(raw_value, field, batch.dataset)
             if batch.dataset == 'participant' and 'status' in values:
                 values['status'] = _participant_status_value(values['status'])
             values = _resolve_import_values(batch.dataset, values)
@@ -259,6 +631,8 @@ def analyze_import_preview(batch, mapping):
             instance = matches.first() or model()
             for field, value in values.items():
                 setattr(instance, field, value)
+            if batch.dataset == 'startup' and not instance.pk and 'status' not in values:
+                instance.status = 'active'
             if 'source' in IMPORT_FIELDS[batch.dataset] and not values.get('source'):
                 instance.source = batch.original_filename
             instance.full_clean(exclude=['slug'] if batch.dataset == 'startup' else None)
@@ -278,7 +652,7 @@ def analyze_import_preview(batch, mapping):
 
 
 def preview_import(batch):
-    headers, rows = read_import_file(batch.file.path)
+    headers, rows = read_import_file(batch.file.path, batch.dataset)
     if batch.dataset == 'mentor':
         normalized = {_normalize(header): header for header in headers}
         first_header = normalized.get('first name')
@@ -296,10 +670,10 @@ def preview_import(batch):
     return headers, rows
 
 
-def commit_import(batch, mapping):
+def commit_import(batch, mapping, field_values=None):
     if batch.status == 'completed':
         raise ValidationError('This batch has already been imported.')
-    headers, rows = read_import_file(batch.file.path)
+    headers, rows = read_import_file(batch.file.path, batch.dataset)
     if batch.dataset == 'mentor':
         normalized = {_normalize(header): header for header in headers}
         first_header = normalized.get('first name')
@@ -324,9 +698,12 @@ def commit_import(batch, mapping):
             values = {}
             try:
                 for field, header in selected.items():
-                    value = _value_for_field(row.get(header), field)
+                    value = _value_for_field(row.get(header), field, batch.dataset)
                     if value is not None:
                         values[field] = value
+                for field, raw_value in (field_values or {}).items():
+                    if field in allowed and raw_value not in (None, ''):
+                        values[field] = _value_for_field(raw_value, field, batch.dataset)
                 if batch.dataset == 'participant' and 'status' in values:
                     values['status'] = _participant_status_value(values['status'])
                 values = _resolve_import_values(batch.dataset, values)
@@ -350,6 +727,8 @@ def commit_import(batch, mapping):
                 previous = (instance.current_stage, instance.status) if batch.dataset == 'participant' and instance.pk else ('', '')
                 for field, value in values.items():
                     setattr(instance, field, value)
+                if batch.dataset == 'startup' and was_created and 'status' not in values:
+                    instance.status = 'active'
                 if 'source' in allowed and not values.get('source'):
                     instance.source = batch.original_filename
                 instance.full_clean(exclude=['slug'] if batch.dataset == 'startup' else None)

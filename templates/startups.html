@@ -5,7 +5,7 @@
 {% block page_title %}Startups{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'style/startups-yc.css' %}?v=20261008-yc9">
+<link rel="stylesheet" href="{% static 'style/startups-yc.css' %}?v=20261008-yc10">
 <style>
     .yc-page .yc-eyebrow::before { background: #000 !important; }
     .yc-page .yc-hero-title sup { color: #000 !important; }
@@ -83,7 +83,7 @@
         <div class="card-body">
             <form method="get" action="{% url 'impact_explorer' %}" class="filter-bar">
                 <label>Four-year range<select class="filter-select" name="period">{% for item in impact_periods %}<option value="{{ item.key }}" {% if item.key == impact_default_period %}selected{% endif %}>{{ item.label }}</option>{% endfor %}</select></label>
-                <label>Startup<select class="filter-select" name="startup"><option value="">All published startups</option>{% for item in impact_startups %}<option value="{{ item.pk }}">{{ item.name }}</option>{% endfor %}</select></label>
+                <label>Startup<select class="filter-select" name="startup"><option value="">All published startups</option>{% for item in impact_startups %}<option value="{{ item.pk }}" {% if impact_selected_startup == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
                 <button class="btn btn-primary" type="submit">View statistics</button>
                 <button class="btn btn-outline" type="submit" name="format" value="pdf">Download PDF</button>
                 <button class="btn btn-outline" type="submit" name="format" value="xlsx">Download Excel</button>
@@ -115,8 +115,8 @@
             </form>
             <div class="yc-toolbar-actions">
                 {% if user.is_authenticated %}<a href="{% url 'staff:startup_create' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Add Startup</a>{% endif %}
-                <a href="{% url 'public_report' kind='startups' %}" class="btn btn-outline"><i class="fas fa-file-csv"></i> CSV</a>
-                <a href="{% url 'public_report_pdf' kind='startups' %}" class="btn btn-outline"><i class="fas fa-file-pdf"></i> PDF</a>
+                <a href="{% url 'public_report' kind='startups' %}{% if page_query %}?{{ page_query }}{% endif %}" data-startup-report-link data-report-base="{% url 'public_report' kind='startups' %}" class="btn btn-outline"><i class="fas fa-file-csv"></i> CSV</a>
+                <a href="{% url 'public_report_pdf' kind='startups' %}{% if page_query %}?{{ page_query }}{% endif %}" data-startup-report-link data-report-base="{% url 'public_report_pdf' kind='startups' %}" class="btn btn-outline"><i class="fas fa-file-pdf"></i> PDF</a>
                 {% if user.profile.is_admin %}<a href="{% url 'admin:staff_startup_changelist' %}" class="btn btn-outline"><i class="fas fa-shield-halved"></i> Manage Startups</a>{% endif %}
             </div>
         </div>
@@ -210,7 +210,19 @@
         syncSearchClearButton();
     }
 
+    function syncReportLinks(url) {
+        document.querySelectorAll('[data-startup-report-link]').forEach(function (link) {
+            var reportUrl = new URL(link.dataset.reportBase, window.location.href);
+            ['q', 'industry', 'status', 'type'].forEach(function (name) {
+                var value = url.searchParams.get(name);
+                if (value) reportUrl.searchParams.set(name, value);
+            });
+            link.href = reportUrl.toString();
+        });
+    }
+
     function loadDirectory(url, historyMode) {
+        syncReportLinks(url);
         if (activeRequest) activeRequest.abort();
         var controller = new AbortController();
         activeRequest = controller;
@@ -268,10 +280,12 @@
     document.addEventListener('input', function (event) {
         if (!event.target.matches('#startupSearch')) return;
         syncSearchClearButton();
+        var form = document.getElementById('startupFilters');
+        if (form) syncReportLinks(directoryUrl(form));
         window.clearTimeout(searchTimer);
         searchTimer = window.setTimeout(function () {
-            var form = document.getElementById('startupFilters');
-            if (form) loadDirectory(directoryUrl(form), 'replace');
+            var currentForm = document.getElementById('startupFilters');
+            if (currentForm) loadDirectory(directoryUrl(currentForm), 'replace');
         }, 350);
     });
 

@@ -1,8 +1,10 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Investor, Mentor, Startup, UserProfile
+from .models import Investor, Mentor, ParticipantJourney, Startup, UserProfile
 
 
 def startup_payload(name='AgriTech Solutions', founders=1):
@@ -538,6 +540,66 @@ class PublicReportCsvTests(TestCase):
         self.assertTrue(response.content.startswith(b'%PDF'))
         self.assertGreater(len(response.content), 1000)
 
+    def test_startup_exports_apply_directory_search_and_filters(self):
+        criteria = {
+            'q': 'Visible Startup',
+            'industry': 'sector:finance',
+            'status': 'active',
+            'type': 'public',
+        }
+
+        csv_response = self.client.get(reverse('public_report', kwargs={'kind': 'startups'}), criteria)
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertEqual(csv_response['X-Report-Rows'], '1')
+        self.assertIn('Visible Startup', csv_response.content.decode('utf-8-sig'))
+        self.assertNotIn('Inactive Startup', csv_response.content.decode('utf-8-sig'))
+
+        pdf_response = self.client.get(reverse('public_report_pdf', kwargs={'kind': 'startups'}), criteria)
+        self.assertEqual(pdf_response.status_code, 200)
+        self.assertEqual(pdf_response['X-Report-Rows'], '1')
+        self.assertTrue(pdf_response.content.startswith(b'%PDF'))
+
+    def test_anonymous_startup_export_cannot_use_status_filter_to_reveal_inactive_rows(self):
+        response = self.client.get(
+            reverse('public_report', kwargs={'kind': 'startups'}),
+            {'status': 'inactive'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['X-Report-Rows'], '0')
+        self.assertNotIn('Inactive Startup', response.content.decode('utf-8-sig'))
+
+    def test_impact_exports_use_selected_period_and_startup(self):
+        selected = Startup.objects.create(
+            name='Selected Impact Venture', status='active', directory_visible=True, year_incubated=2022,
+        )
+        Startup.objects.create(
+            name='Other Impact Venture', status='active', directory_visible=True, year_incubated=2022,
+        )
+        Startup.objects.create(
+            name='Outside Period Venture', status='active', directory_visible=True, year_incubated=2018,
+        )
+        for startup in Startup.objects.filter(name__contains='Impact Venture'):
+            ParticipantJourney.objects.create(participant_name=f'{startup.name} participant', startup=startup)
+
+        for report_format, builder in (
+            ('xlsx', 'startup_impact_xlsx'),
+            ('pdf', 'startup_impact_pdf'),
+        ):
+            with self.subTest(format=report_format):
+                with patch(f'staff.impact_reports.{builder}', return_value=b'report') as build_report:
+                    response = self.client.get(reverse('impact_explorer'), {
+                        'period': '2022-2025',
+                        'startup': selected.pk,
+                        'format': report_format,
+                    })
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, b'report')
+                period_label, _summary, _annual_rows, startup_rows, _as_of = build_report.call_args.args
+                self.assertEqual(period_label, '2022–2025')
+                self.assertEqual([row['startup'].pk for row in startup_rows], [selected.pk])
+
     def test_pdf_report_rejects_unknown_kind_and_post(self):
         self.assertEqual(
             self.client.get(reverse('public_report_pdf', kwargs={'kind': 'passwords'})).status_code, 404,
@@ -818,6 +880,15 @@ class YcDirectoryPageTests(TestCase):
         self.assertContains(response, 'name="status"')
         self.assertContains(response, 'name="type"')
 
+    def test_report_links_keep_directory_filters(self):
+        response = self.client.get(reverse('staff:startups'), {
+            'q': 'Pay', 'industry': 'sector:finance', 'status': 'active', 'type': 'public', 'page': '2',
+        })
+
+        query = '?q=Pay&amp;industry=sector%3Afinance&amp;status=active&amp;type=public'
+        self.assertContains(response, reverse('public_report', kwargs={'kind': 'startups'}) + query)
+        self.assertContains(response, reverse('public_report_pdf', kwargs={'kind': 'startups'}) + query)
+
     def test_search_filters_directory_startups(self):
         response = self.client.get(reverse('staff:startups'), {'q': 'Pay'})
         startups = list(response.context['startup_list'])
@@ -832,6 +903,55 @@ class YcDirectoryPageTests(TestCase):
         self.assertContains(response, 'No startups found')
         self.assertContains(response, 'Try a different search term or adjust your filters.')
         self.assertContains(response, 'Clear filters')
+
+    def test_impact_selectors_keep_selected_range_and_startup(self):
+        startup = Startup.objects.create(
+            name='Selected Cohort Venture',
+            status='active',
+            directory_visible=True,
+            year_incubated=2022,
+        )
+        outside_range_startup = Startup.objects.create(
+            name='Earlier Cohort Venture',
+            status='active',
+            directory_visible=True,
+            year_incubated=2018,
+        )
+        response = self.client.get(reverse('staff:startups'), {
+            'period': '2022-2025',
+            'startup': str(startup.pk),
+        })
+
+        self.assertContains(response, 'value="2022-2025" selected')
+        self.assertContains(response, f'value="{startup.pk}" selected')
+        self.assertIn(startup, response.context['impact_startups'])
+        self.assertIn(outside_range_startup, response.context['impact_startups'])
+
+    def test_impact_explorer_startup_dropdown_lists_all_published_startups(self):
+        in_range = Startup.objects.create(
+            name='Current Cohort Startup',
+            status='active',
+            directory_visible=True,
+            year_incubated=2022,
+        )
+        outside_range = Startup.objects.create(
+            name='Earlier Cohort Startup',
+            status='active',
+            directory_visible=True,
+            year_incubated=2018,
+        )
+
+        response = self.client.get(reverse('impact_explorer'), {
+            'period': '2022-2025',
+            'startup': str(outside_range.pk),
+        })
+
+        self.assertContains(response, 'All published startups')
+        self.assertContains(response, 'Current Cohort Startup')
+        self.assertContains(response, f'value="{outside_range.pk}" selected')
+        self.assertContains(response, 'Earlier Cohort Startup')
+        self.assertEqual(response.context['selected_startup'], str(outside_range.pk))
+        self.assertEqual(list(response.context['startup_rows']), [])
 
     def test_report_and_add_links_present(self):
         response = self.client.get(reverse('staff:startups'))
