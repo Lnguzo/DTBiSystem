@@ -798,17 +798,13 @@ class YcDirectoryPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="yc-page"')
         self.assertContains(response, 'style/startups-yc.css')
-        self.assertContains(response, 'id="ycRail"')
+        self.assertNotContains(response, 'id="ycRail"')
         self.assertContains(response, 'class="yc-grid"')
 
-    def test_showcase_context_lists_featured_startups(self):
+    def test_spotlight_section_is_removed(self):
         response = self.client.get(reverse('staff:startups'))
-        showcase = response.context['showcase']
-        self.assertEqual(len(showcase), 2)
-        for startup in showcase:
-            self.assertContains(
-                response, reverse('staff:startup_profile', kwargs={'slug': startup.slug})
-            )
+        self.assertNotContains(response, 'In the spotlight')
+        self.assertNotContains(response, 'Ventures to know')
 
     def test_filter_form_contract_preserved(self):
         response = self.client.get(reverse('staff:startups'), {'q': 'Pay', 'status': 'active'})
@@ -860,10 +856,9 @@ class YcDirectoryPageTests(TestCase):
         # Inactive startups stay hidden from non-admin visitors
         self.assertNotContains(response, 'Hidden Venture')
 
-    def test_empty_state_renders_without_showcase(self):
+    def test_empty_state_renders_without_spotlight(self):
         Startup.objects.all().delete()
         response = self.client.get(reverse('staff:startups'))
         self.assertContains(response, 'No startups yet')
         self.assertContains(response, 'yc-empty')
-        self.assertEqual(response.context['showcase'], [])
         self.assertNotContains(response, 'id="ycRail"')
