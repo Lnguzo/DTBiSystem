@@ -814,10 +814,28 @@ class YcDirectoryPageTests(TestCase):
         response = self.client.get(reverse('staff:startups'), {'q': 'Pay', 'status': 'active'})
         self.assertContains(response, 'id="startupFilters"')
         self.assertContains(response, 'id="startupSearch"')
+        self.assertContains(response, 'class="btn btn-primary yc-search-submit" type="submit"')
+        self.assertContains(response, 'id="startupSearchClear"')
+        self.assertContains(response, 'id="directoryResults"')
         self.assertContains(response, 'name="q" value="Pay"')
         self.assertContains(response, 'name="industry"')
         self.assertContains(response, 'name="status"')
         self.assertContains(response, 'name="type"')
+
+    def test_search_filters_directory_startups(self):
+        response = self.client.get(reverse('staff:startups'), {'q': 'Pay'})
+        startups = list(response.context['startup_list'])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.s2, startups)
+        self.assertNotIn(self.s1, startups)
+
+    def test_empty_search_results_offer_filter_reset(self):
+        response = self.client.get(reverse('staff:startups'), {'q': 'No matching venture'})
+
+        self.assertContains(response, 'No startups found')
+        self.assertContains(response, 'Try a different search term or adjust your filters.')
+        self.assertContains(response, 'Clear filters')
 
     def test_report_and_add_links_present(self):
         response = self.client.get(reverse('staff:startups'))
