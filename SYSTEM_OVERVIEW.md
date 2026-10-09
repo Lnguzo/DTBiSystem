@@ -387,9 +387,13 @@ The selected login type is checked against the account's Django flags and stored
 ### Staff Data Hub and bulk import
 
 1. Staff/admin open `/staff/data/` and choose imports, reports, page visits, partnerships, mentor sessions, or Participant Journey.
-2. The importer accepts Excel (`.xlsx`), CSV, and table-based text PDFs, up to 20 MB and 20,000 data rows. It reads the first Excel worksheet; scanned PDFs require conversion to a supported table/text format.
+2. The importer accepts Excel (`.xlsx`), CSV, and PDFs, up to 20 MB and 20,000 data rows. It reads the first Excel worksheet; PDFs can contain text tables, label/value record tables, labeled forms, or scanned images. Scanned PDFs are OCRed locally with the free Tesseract engine, then interpreted using the selected record type. The preview shows extracted values per platform field and marks information not present in the document instead of guessing.
 3. Staff map file columns to system fields, review duplicate identities and row validation issues, then explicitly confirm the import. A batch records created, updated, and skipped rows; issue rows can be downloaded as CSV.
 4. Participant imports match by email or name/cohort. Optional startup links require one exact match to an existing startup; imports never silently create linked startup records.
+
+#### Scanned PDF OCR setup
+
+Install Python dependencies with `pip install -r requirements.txt`, and install the free Tesseract OCR engine separately. On Windows, `winget install --id UB-Mannheim.TesseractOCR --exact` installs the supported community build; on Debian/Ubuntu, install the `tesseract-ocr` package. Restart the Django process after installing the engine. The app detects the standard Windows install path or `tesseract` on `PATH`; set `TESSERACT_CMD` to the executable path when installed elsewhere. OCR uses English by default; set `TESSERACT_LANG` to an installed language code (or combination such as `eng+swa`) if needed. Extracted fields remain in the import preview for staff review before saving.
 
 ### Participant journey, support, and outcomes
 
@@ -551,7 +555,7 @@ Current known limitations and operational considerations:
 4. Outcome comparisons need at least one snapshot from before the reporting period and one during it. New participant records without a baseline are reported as snapshots but excluded from change comparisons.
 5. Participant programme stages and support types are fixed in model choices. Change them through a planned code/migration update, not free text. Evidence attachments and formal attendance/session registration for training or lab use are not yet implemented.
 6. Participant outcome snapshots are staff-entered monitoring data, not independently verified financial/employment records. Reports should be read as data entered in the system.
-7. The importer reads the first worksheet from an Excel workbook and extracts tabular text from PDFs; it does not OCR scanned documents.
+7. The importer reads the first worksheet from Excel workbooks and uses Tesseract OCR for scanned PDFs; OCR quality depends on scan clarity and the selected language data.
 8. `email_notifications` is a saved preference, but outgoing event email is not implemented. The configured development email backend writes to the console.
 9. Media storage is configured, but the root URL configuration does not serve media in development. Configure production storage and permissions before deployment.
 10. Public landing funding is summed across stored amounts and shown with a dollar sign, without currency conversion. Prefer currency-grouped period reports for financial comparison.

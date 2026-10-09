@@ -14,7 +14,8 @@ from html import escape as html_escape
 from django.http import Http404, HttpResponse
 from django.views.decorators.http import require_GET
 
-from .models import Investor, Mentor, Startup
+from .models import Investor, Mentor, Startup, UserProfile
+from .startup_filters import apply_startup_directory_filters
 
 REPORT_KINDS = ('startups', 'mentors', 'investors')
 
@@ -43,8 +44,13 @@ def _clean(value, limit=None):
     return text
 
 
-def _startups_rows():
-    queryset = Startup.objects.filter(directory_visible=True, status='active').order_by('name')
+def _startups_rows(params=None, include_non_active=False):
+    queryset = Startup.objects.filter(directory_visible=True)
+    if not include_non_active:
+        queryset = queryset.filter(status='active')
+    if params is not None:
+        queryset = apply_startup_directory_filters(queryset, params)
+    queryset = queryset.order_by('name')
     headers = [
         'Name', 'Type', 'Industry', 'Description', 'Website', 'Contact email',
         'Source', 'Founded date', 'Profile completed (%)',
@@ -117,18 +123,32 @@ _BUILDERS = {
 }
 
 
-def _report_parts(kind):
+def _report_parts(kind, request=None):
     if kind not in REPORT_KINDS:
         raise Http404
     title, filename_base = _REPORT_META[kind]
-    headers, rows = _BUILDERS[kind]()
+    if kind == 'startups':
+        is_admin = bool(
+            request
+            and request.user.is_authenticated
+            and (
+                request.user.is_superuser
+                or UserProfile.objects.filter(user=request.user, user_type='admin').exists()
+            )
+        )
+        headers, rows = _startups_rows(
+            params=request.GET if request else None,
+            include_non_active=is_admin,
+        )
+    else:
+        headers, rows = _BUILDERS[kind]()
     return title, filename_base, headers, rows
 
 
 @require_GET
 def public_report_csv(request, kind):
     """Serve a public directory report as a well-structured CSV download."""
-    title, filename_base, headers, rows = _report_parts(kind)
+    title, filename_base, headers, rows = _report_parts(kind, request)
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, quoting=csv.QUOTE_ALL, lineterminator='\n')
@@ -157,13 +177,10 @@ def _build_pdf(kind, title, filename_base, headers, rows, row_count):
             text = text.encode('latin-1', 'replace').decode('latin-1')
         return Paragraph(text, style)
 
-    try:
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-    except ImportError as exc:  # pragma: no cover - dependency declared in requirements.txt
-        raise Http404 from exc
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     output = io.BytesIO()
     page = landscape(A4)
@@ -225,7 +242,7 @@ def _build_pdf(kind, title, filename_base, headers, rows, row_count):
 @require_GET
 def public_report_pdf(request, kind):
     """Serve a public directory report as a printable PDF download."""
-    title, filename_base, headers, rows = _report_parts(kind)
+    title, filename_base, headers, rows = _report_parts(kind, request)
     # Materialize and clean once so the row count and the table always agree.
     cleaned = [[_clean(cell) for cell in row] for row in rows]
     payload, filename = _build_pdf(kind, title, filename_base, headers, cleaned, len(cleaned))

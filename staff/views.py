@@ -1,4 +1,3 @@
-import re
 from datetime import date
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -32,51 +31,13 @@ from .forms import (
     ProfilePreferencesForm, MentorForm, InvestorForm, ManagedUserForm, StartupInquiryForm,
 )
 from .data_views import record_page_visit
-
-User = get_user_model()
-
-STARTUP_INDUSTRY_CATEGORIES = (
-    ('agriculture', 'Agriculture & Agritech', ('agriculture', 'agri', 'agribusiness', 'farming', 'livestock')),
-    ('biotechnology', 'Biotechnology & Life Sciences', ('biotech', 'biotechnology', 'life science', 'laboratory')),
-    ('construction', 'Construction & Real Estate', ('construction', 'real estate', 'property', 'building')),
-    ('creative', 'Creative Industries & Media', ('creative', 'media', 'film', 'design', 'animation', 'publishing')),
-    ('education', 'Education & EdTech', ('education', 'edtech', 'edu-tech', 'e-learning', 'learning', 'training')),
-    ('energy', 'Energy & Clean Technology', ('energy', 'renewable', 'solar', 'clean technology', 'cleantech')),
-    ('finance', 'Financial Services & FinTech', ('financial', 'finance', 'fintech', 'banking', 'payments', 'insurance')),
-    ('food', 'Food & Beverage', ('food', 'beverage', 'food processing')),
-    ('health', 'Health & MedTech', ('health', 'medical', 'medtech', 'pharma', 'wellness')),
-    ('ict', 'ICT & Software', ('ict', 'software', 'information technology', 'telecommunications', 'computer systems', 'cybersecurity')),
-    ('manufacturing', 'Manufacturing & Industry', ('manufacturing', 'industrial', 'engineering', 'fabrication')),
-    ('professional', 'Professional & Business Services', ('professional services', 'business services', 'consulting')),
-    ('retail', 'Retail & E-commerce', ('retail', 'e-commerce', 'ecommerce', 'online marketplace')),
-    ('social', 'Social Enterprise & Community Services', ('social enterprise', 'community services', 'non-profit', 'nonprofit')),
-    ('tourism', 'Tourism & Hospitality', ('tourism', 'hospitality', 'travel', 'hotel')),
-    ('transport', 'Transport & Logistics', ('transport', 'logistics', 'mobility', 'delivery')),
-    ('water', 'Water & Sanitation', ('water', 'sanitation', 'waste management')),
+from .startup_filters import (
+    STARTUP_INDUSTRY_CATEGORIES,
+    apply_startup_directory_filters,
+    industry_matches_sector_keywords,
 )
 
-
-def _sector_keyword_pattern(keyword):
-    """Anchor a sector keyword to its left word edge only.
-
-    Left edge, not both: `edtech` must not match "Health & MedTech" (embedded),
-    while `agri` must still match "Agritech" (prefix).
-    """
-    return r'(?<![A-Za-z])' + re.escape(keyword)
-
-
-def sector_query(sector):
-    """Industry query matching one STARTUP_INDUSTRY_CATEGORIES entry."""
-    query = Q()
-    for keyword in sector[2]:
-        query |= Q(industry__iregex=_sector_keyword_pattern(keyword))
-    return query
-
-
-def industry_matches_sector_keywords(industry_text, keywords):
-    """True when `industry_text` contains a sector keyword at its left word edge."""
-    return any(re.search(_sector_keyword_pattern(keyword), industry_text) for keyword in keywords)
-
+User = get_user_model()
 
 def get_visitor_counts():
     now = timezone.localtime()
@@ -109,6 +70,18 @@ def _impact_period_options(current_year, available_years=()):
         {'start': year, 'end': year + 3, 'key': f'{year}-{year + 3}', 'label': f'{year}–{year + 3}'}
         for year in range(anchor, last_start + 1, 4)
     ]
+
+
+def _startups_in_impact_period(startups, period):
+    return startups.filter(
+        Q(year_incubated__range=(period['start'], period['end']))
+        | Q(year_incubated__isnull=True, incubation_start__year__range=(period['start'], period['end']))
+        | Q(
+            year_incubated__isnull=True,
+            incubation_start__isnull=True,
+            founded_date__year__range=(period['start'], period['end']),
+        )
+    )
 
 
 def _startup_industry_icon(industry):
@@ -316,14 +289,10 @@ def impact_explorer(request):
     period = next((item for item in periods if item['key'] == period_key), default_period)
     selected_startup = request.GET.get('startup', '').strip()
 
-    cohort = visible_startups.filter(
-        Q(year_incubated__range=(period['start'], period['end']))
-        | Q(year_incubated__isnull=True, incubation_start__year__range=(period['start'], period['end']))
-        | Q(year_incubated__isnull=True, incubation_start__isnull=True, founded_date__year__range=(period['start'], period['end']))
-    )
+    cohort = _startups_in_impact_period(visible_startups, period)
     startup = None
     if selected_startup.isdigit():
-        startup = cohort.filter(pk=selected_startup).first()
+        startup = visible_startups.filter(pk=selected_startup).first()
         if startup:
             cohort = cohort.filter(pk=startup.pk)
         else:
@@ -393,7 +362,8 @@ def impact_explorer(request):
     part_time_share = round(summary['part_time_jobs'] * 100 / employment_total, 1) if employment_total else 0
     return render(request, 'impact_explorer.html', {
         'periods': periods, 'selected_period': period['key'], 'period_label': period['label'],
-        'startups': cohort, 'selected_startup': str(startup.pk) if startup else '',
+        'startups': cohort, 'available_startups': visible_startups,
+        'selected_startup': str(startup.pk) if startup else '',
         'startup': startup, 'startup_count': summary['published_startups'],
         'participant_count': summary['participant_journeys_started'],
         'support_count': summary['support_activities'], 'supported_count': summary['participants_supported'],
@@ -456,30 +426,17 @@ def startups(request):
     if not is_admin:
         startup_list = startup_list.filter(status='active')
     startup_list = startup_list.order_by('industry', 'name')
-    # Filter by type if specified
     startup_type = request.GET.get('type', '').strip().lower()
-    if startup_type in {'public', 'individual'}:
-        startup_list = startup_list.filter(startup_type=startup_type)
+    if startup_type not in {'public', 'individual'}:
+        startup_type = ''
     search_query = request.GET.get('q', '').strip()
     industry_filter = request.GET.get('industry', '').strip()
     status_filter = request.GET.get('status', '').strip().lower()
-    if search_query:
-        startup_list = startup_list.filter(
-            Q(name__icontains=search_query) | Q(industry__icontains=search_query)
-            | Q(description__icontains=search_query) | Q(source__icontains=search_query)
-        )
     if industry_filter.startswith('sector:'):
         sector_key = industry_filter.split(':', 1)[1]
-        sector = next((item for item in STARTUP_INDUSTRY_CATEGORIES if item[0] == sector_key), None)
-        if sector:
-            startup_list = startup_list.filter(sector_query(sector))
-        else:
+        if not any(item[0] == sector_key for item in STARTUP_INDUSTRY_CATEGORIES):
             industry_filter = ''
-    elif industry_filter:
-        raw_industry = industry_filter.split(':', 1)[1] if industry_filter.startswith('industry:') else industry_filter
-        startup_list = startup_list.filter(industry__iexact=raw_industry)
-    if status_filter in dict(Startup.STATUS_CHOICES):
-        startup_list = startup_list.filter(status=status_filter)
+    startup_list = apply_startup_directory_filters(startup_list, request.GET)
     industries = list(Startup.objects.filter(directory_visible=True).exclude(industry='').values_list('industry', flat=True).distinct().order_by('industry'))
     industry_options = [
         {'value': f'sector:{key}', 'label': label}
@@ -522,10 +479,18 @@ def startups(request):
     impact_periods = _impact_period_options(current_year, known_years)
     latest_data_year = max((year for year in known_years if year <= current_year), default=current_year)
     current_period = next((item for item in impact_periods if item['start'] <= latest_data_year <= item['end']), impact_periods[-1])
+    selected_impact_period = next(
+        (item for item in impact_periods if item['key'] == request.GET.get('period')),
+        current_period,
+    )
+    selected_impact_startup = request.GET.get('startup', '').strip()
+    if not selected_impact_startup.isdigit() or not impact_startups.filter(pk=selected_impact_startup).exists():
+        selected_impact_startup = ''
     context = {
         'startup_list': page_obj,
         'impact_periods': impact_periods,
-        'impact_default_period': current_period['key'],
+        'impact_default_period': selected_impact_period['key'],
+        'impact_selected_startup': selected_impact_startup,
         'impact_startups': impact_startups,
         'page_obj': page_obj,
         'filter_type': startup_type or '',

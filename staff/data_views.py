@@ -18,7 +18,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
 from django.db.models.functions import TruncMonth
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -26,7 +26,7 @@ from django.views.decorators.http import require_http_methods
 from openpyxl import Workbook
 
 from .data_services import (
-    IMPORT_FIELDS, IMPORT_MODELS, analyze_import_preview, commit_import,
+    IMPORT_FIELDS, IMPORT_MODELS, _value_for_field, analyze_import_preview, commit_import,
     preview_import, report_data,
 )
 from .forms import (
@@ -99,6 +99,35 @@ def data_hub(request):
         'partnership_pipeline': partnership_pipeline,
         'upcoming_session_count': upcoming_session_count,
     })
+
+
+@staff_or_admin_required
+def data_import_template(request, dataset):
+    if dataset not in IMPORT_FIELDS:
+        raise Http404
+
+    model = IMPORT_MODELS[dataset]
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = model._meta.verbose_name_plural[:31].title()
+    headers = [
+        model._meta.get_field(field).verbose_name.title()
+        for field in IMPORT_FIELDS[dataset]
+    ]
+    sheet.append(headers)
+    sheet.freeze_panes = 'A2'
+    sheet.auto_filter.ref = f'A1:{sheet.cell(row=1, column=len(headers)).column_letter}1'
+    for index, header in enumerate(headers, start=1):
+        sheet.column_dimensions[sheet.cell(row=1, column=index).column_letter].width = min(max(len(header) + 3, 14), 32)
+
+    output = io.BytesIO()
+    workbook.save(output)
+    response = HttpResponse(
+        output.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{dataset}-import-template.xlsx"'
+    return response
 
 
 def _month_keys(count=12):
@@ -423,15 +452,21 @@ def data_import(request):
     headers = []
     rows = []
     mapping = {}
+    field_values = {}
     preview_analysis = None
     if request.method == 'POST' and request.POST.get('action') in {'check', 'confirm'}:
         batches = DataImportBatch.objects.all() if is_admin else DataImportBatch.objects.filter(uploaded_by=request.user)
         batch = get_object_or_404(batches, pk=request.POST.get('batch_id'))
         mapping = {field: request.POST.get(f'map_{field}', '') for field in IMPORT_FIELDS[batch.dataset]}
         mapping = {field: header for field, header in mapping.items() if header}
+        field_values = {
+            field: request.POST.get(f'value_{field}', '')
+            for field in IMPORT_FIELDS[batch.dataset]
+            if f'value_{field}' in request.POST
+        }
         if request.POST.get('action') == 'check':
             try:
-                preview_analysis = analyze_import_preview(batch, mapping)
+                preview_analysis = analyze_import_preview(batch, mapping, field_values)
                 batch.field_mapping = mapping
                 batch.row_errors = [
                     {'row': row['row'], 'error': row['message']}
@@ -443,7 +478,7 @@ def data_import(request):
                 messages.error(request, '; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc))
         else:
             try:
-                commit_import(batch, mapping)
+                commit_import(batch, mapping, field_values)
                 messages.success(request, f'Import complete: {batch.created_count} created, {batch.updated_count} updated, {batch.skipped_count} skipped.')
             except ValidationError as exc:
                 messages.error(request, '; '.join(exc.messages))
@@ -507,6 +542,68 @@ def data_import(request):
         key: IMPORT_MODELS[batch.dataset]._meta.get_field(key).verbose_name.title()
         for key in field_keys
     } if batch else {}
+    record_form_mode = bool(
+        batch and batch.status == 'preview' and len(rows) == 1
+        and all(
+            IMPORT_MODELS[batch.dataset]._meta.get_field(field).verbose_name.title() in headers
+            for field in field_keys
+        )
+    )
+    if record_form_mode:
+        field_values = {
+            field: rows[0].get(mapping.get(field, ''), '')
+            for field in field_keys
+        }
+        if batch.dataset == 'startup':
+            if not field_values.get('status'):
+                field_values['status'] = 'active'
+            if not field_values.get('source'):
+                field_values['source'] = batch.original_filename
+    if request.method == 'POST' and batch and batch.status == 'preview':
+        field_values.update({
+            field: request.POST.get(f'value_{field}', '')
+            for field in field_keys
+            if f'value_{field}' in request.POST
+        })
+    record_form_fields = []
+    if record_form_mode:
+        for field in field_keys:
+            model_field = IMPORT_MODELS[batch.dataset]._meta.get_field(field)
+            raw_value = field_values.get(field, '')
+            if raw_value and model_field.choices:
+                try:
+                    raw_value = _value_for_field(raw_value, field, batch.dataset)
+                except ValidationError:
+                    pass
+            elif raw_value and model_field.get_internal_type() == 'DateField':
+                try:
+                    raw_value = _value_for_field(raw_value, field, batch.dataset).isoformat()
+                except ValidationError:
+                    pass
+            record_form_fields.append({
+                'key': field,
+                'label': field_labels[field],
+                'value': raw_value,
+                'choices': model_field.choices,
+                'is_textarea': model_field.get_internal_type() in {'TextField'},
+                'input_type': 'date' if model_field.get_internal_type() == 'DateField' else 'text',
+            })
+    destination_pages = {
+        'startup': ('Startups', reverse('staff:startups')),
+        'mentor': ('Mentors', reverse('mentors')),
+        'investor': ('Investors', reverse('investors')),
+        'participant': ('Participant journeys', reverse('staff:participant_journey')),
+    }
+    import_destination = destination_pages.get(batch.dataset) if batch and batch.status == 'completed' else None
+    preview_record_fields = []
+    if rows and batch:
+        for field in field_keys:
+            header = mapping.get(field)
+            value = rows[0].get(header, '') if header else ''
+            preview_record_fields.append({
+                'label': field_labels[field],
+                'value': value if value not in (None, '') else 'Not found in uploaded file',
+            })
     return render(request, 'data_import.html', {
         'batch': batch,
         'headers': headers,
@@ -516,6 +613,10 @@ def data_import(request):
         'datasets': DataImportBatch.DATASETS,
         'preview_analysis': preview_analysis,
         'preview_issue_rows': [row for row in (preview_analysis or {}).get('rows', []) if row['status'] == 'issue'][:30],
+        'preview_record_fields': preview_record_fields,
+        'record_form_mode': record_form_mode,
+        'record_form_fields': record_form_fields,
+        'import_destination': import_destination,
     })
 
 

@@ -12,3 +12,10 @@ private_imports/
 
 # Local development settings
 .env
+staff/__pycache__/admin.cpython-314.pyc
+staff/__pycache__/admin.cpython-314.pyc
+staff/__pycache__/apps.cpython-314.pyc
+staff/__pycache__/forms.cpython-314.pyc
+staff/__pycache__/signals.cpython-314.pyc
+staff/__pycache__/admin.cpython-314.pyc
+staff/__pycache__/views.cpython-314.pyc

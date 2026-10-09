@@ -15,7 +15,7 @@
   --yc-ink-3: #8a867b;
   --yc-line: #e7e2d5;
   --yc-line-2: #d5cfbf;
-  --yc-accent: #e8590c;
+  --yc-accent: var(--navy-700);
   --yc-green-bg: #e8f4ec;
   --yc-green-ink: #1e6b3a;
   --yc-gold-bg: #fbf1de;
