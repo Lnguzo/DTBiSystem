@@ -150,9 +150,16 @@ class StartupInquiryForm(forms.ModelForm):
         max_length=5000,
         widget=forms.Textarea(attrs={
             'class': 'form-textarea', 'rows': 4,
-            'placeholder': 'Describe the opportunity, timing, and how SmartDarasa can follow up.',
+            'placeholder': 'Describe the opportunity, timing, and preferred follow-up details.',
         }),
     )
+
+    def __init__(self, *args, startup=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if startup is not None:
+            self.fields['message'].widget.attrs['placeholder'] = (
+                f"Describe the opportunity, timing, and how {startup.name} can follow up."
+            )
 
     class Meta:
         model = StartupInquiry

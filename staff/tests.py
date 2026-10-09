@@ -1,9 +1,10 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from .forms import StartupInquiryForm
 from .models import Investor, Mentor, ParticipantJourney, Startup, UserProfile
 
 
@@ -982,3 +983,18 @@ class YcDirectoryPageTests(TestCase):
         self.assertContains(response, 'No startups yet')
         self.assertContains(response, 'yc-empty')
         self.assertNotContains(response, 'id="ycRail"')
+
+
+class StartupInquiryFormTests(SimpleTestCase):
+    def test_message_placeholder_uses_the_current_startup_name(self):
+        first = StartupInquiryForm(startup=type("Startup", (), {"name": "SmartDarasa"})())
+        second = StartupInquiryForm(startup=type("Startup", (), {"name": "Shule Yetu"})())
+
+        self.assertEqual(
+            first.fields["message"].widget.attrs["placeholder"],
+            "Describe the opportunity, timing, and how SmartDarasa can follow up.",
+        )
+        self.assertEqual(
+            second.fields["message"].widget.attrs["placeholder"],
+            "Describe the opportunity, timing, and how Shule Yetu can follow up.",
+        )

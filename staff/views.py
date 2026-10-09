@@ -872,9 +872,9 @@ def startup_profile(request, slug):
     profile = get_profile(request.user) if authenticated else None
     more_login_url = f"{reverse('staff:user_login')}?{urlencode({'next': request.get_full_path()})}"
     is_inquiry_submission = request.method == 'POST' and request.POST.get('form_type') == 'startup_inquiry'
-    inquiry_form = StartupInquiryForm()
+    inquiry_form = StartupInquiryForm(startup=startup)
     if is_inquiry_submission:
-        inquiry_form = StartupInquiryForm(request.POST)
+        inquiry_form = StartupInquiryForm(request.POST, startup=startup)
         if inquiry_form.is_valid():
             inquiry = inquiry_form.save(commit=False)
             inquiry.startup = startup
