@@ -451,7 +451,7 @@ def startups(request):
             industry_options.append({'value': f'industry:{industry}', 'label': industry})
     query_params = request.GET.copy()
     query_params.pop('page', None)
-    page_obj = Paginator(startup_list, 25).get_page(request.GET.get('page'))
+    page_obj = Paginator(startup_list, 12).get_page(request.GET.get('page'))
     for item in page_obj.object_list:
         item.industry_icon = _startup_industry_icon(item.industry)
         illustrative = _illustrative_startup_metrics(item)
