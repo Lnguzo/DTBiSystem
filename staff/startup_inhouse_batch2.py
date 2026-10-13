@@ -1,0 +1,137 @@
+"""Startup records transcribed from the BUNI in-house applications, batch 2."""
+
+BATCH_2 = [
+    {
+        'name': 'Jicho Pori Tours & Safaris Ltd',
+        'industry': 'Tourism & Safaris',
+        'description': 'A Tanzania-based tours and safaris company offering trips to national parks, historical sites, mountain climbing adventures, and beach holidays in Zanzibar.',
+        'website': 'https://jichoporitours.blogspot.com/',
+        'email': 'jichobunditz@gmail.com', 'phone': '0783913291',
+        'contact': 'Hussein Ngahungula', 'address': 'Dar es Salaam, Tanzania',
+        'year_incubated': 2019,
+        'summary_source': 'BUNI in-house startup application; Jicho Pori guide profile: https://www.tourhq.com/guide/TZ69892/jicho-pori-tours-safaris-ltd',
+        'sections': [
+            ('Tours and safari experiences', 'A public guide profile lists wildlife and camping safaris, beach holidays, mountain climbing, cultural and historical tours, transfers, balloon safaris, and accommodation booking. It describes the company as a locally owned Tanzanian tour operator.', 'Jicho Pori guide profile: https://www.tourhq.com/guide/TZ69892/jicho-pori-tours-safaris-ltd'),
+        ],
+    },
+    {
+        'name': 'Tuits', 'industry': 'EdTech / Web Development',
+        'description': 'A web system designed to streamline file sharing and help people find educational institutions.',
+        'website': 'https://www.tuits.co.tz/',
+        'email': 'onassiskenan@gmail.com', 'phone': '0687092345',
+        'contact': 'Onasis Mvanga', 'address': 'Tanzania',
+        'year_incubated': 2019,
+        'summary_source': 'BUNI in-house startup application; supplied website could not be independently verified during import.',
+        'sections': [
+            ('Education and file sharing', 'The application describes a web system for sharing files and discovering educational institutions. The listed website is retained from the application, but current product details could not be independently confirmed.', 'Source: BUNI in-house startup application.'),
+        ],
+    },
+    {
+        'name': 'Fiti Milele', 'industry': 'Health & Fitness / Online Coaching',
+        'description': 'Helps people lose weight and become fitter by teaching healthy eating habits online through coaching programs.',
+        'website': 'https://www.fitimilele.com/',
+        'email': 'simongabriel12@gmail.com', 'phone': '+255712144478',
+        'contact': 'Simon Mnyele', 'address': 'Tanzania / Lindi',
+        'year_incubated': 2016,
+        'summary_source': 'BUNI in-house startup application; archived Fiti Milele app listing (2017): https://apkpure.net/fiti-milele/a2017.project.customer.wilsonkifua.fitimilele',
+        'sections': [
+            ('Fitness and nutrition coaching', 'The application describes online coaching focused on healthier eating and weight management. An archived 2017 app listing under the Fiti Milele name also discusses nutrition and weight-loss guidance; current service availability was not verified.', 'BUNI in-house startup application; archived app listing: https://apkpure.net/fiti-milele/a2017.project.customer.wilsonkifua.fitimilele'),
+        ],
+    },
+    {
+        'name': 'Karata Technologies', 'industry': 'Fintech / Payment Systems',
+        'description': 'A technology startup working on a digital payment system.',
+        'website': 'https://twitter.com/Karatatech',
+        'email': 'christopherbwire@gmail.com', 'phone': '0752057327',
+        'contact': 'Christopher Bwire', 'address': 'Tanzania',
+        'year_incubated': 2020,
+        'summary_source': 'BUNI in-house startup application; public company details and current account activity could not be confirmed.',
+        'sections': [
+            ('Digital payments', 'The application identifies Karata Technologies as a startup working on a digital payment system. The listed social-media account is retained as supplied; no additional product features have been independently verified.', 'Source: BUNI in-house startup application.'),
+        ],
+    },
+    {
+        'name': 'Smarterads', 'industry': 'Digital Marketing / Software Solutions',
+        'description': 'A digital marketing agency that helps businesses digitize processes through marketing skills training and technology solutions.',
+        'website': '',
+        'email': 'shushudavid55@gmail.com', 'phone': '0769986530',
+        'contact': 'Mashauri Enock Shushu', 'address': 'Tanzania',
+        'year_incubated': 2018,
+        'summary_source': 'BUNI in-house startup application. The supplied Google Play link is for CakeTapp and could not be confirmed as a Smarterads product, so it is not set as the company website.',
+        'sections': [
+            ('Marketing and technology services', 'The application describes digital marketing skills training and technology solutions that help businesses digitize their processes. The supplied app link points to CakeTapp; its relationship to Smarterads was not verified.', 'Source: BUNI in-house startup application; supplied app link: https://play.google.com/store/apps/details?id=com.portabo.caketapp'),
+        ],
+    },
+    {
+        'name': 'Fynhacker Limited', 'industry': 'Cybersecurity / Software Development',
+        'description': 'Provides computer programming, cybersecurity, data processing, hosting, and related technology services.',
+        'website': 'https://fynhacker.com/',
+        'email': 'fynhacker@gmail.com', 'phone': '0757000722',
+        'contact': 'Makubi Makubi', 'address': 'Tanzania',
+        'year_incubated': 2019,
+        'summary_source': 'BUNI in-house startup application; historic Fynhacker Hosting company listing: https://www.tanzapages.com/company/15042/Fynhacker_Hosting',
+        'sections': [
+            ('Technology services', 'The application lists programming, cybersecurity, data processing, and hosting. A historic company directory entry under Fynhacker Hosting describes web design and hosting services in Dar es Salaam and lists the same website; that listing is dated and may not reflect the current service range.', 'BUNI in-house startup application; historic directory listing: https://www.tanzapages.com/company/15042/Fynhacker_Hosting'),
+        ],
+    },
+    {
+        'name': 'Xtend Africa Ltd', 'industry': 'Enterprise Software / Digital Transformation',
+        'description': 'Uses digital platforms to replace manual organizational processes with digital workflows for marketing, sales, information systems, and accounting, with the aim of reducing costs and improving efficiency.',
+        'website': '',
+        'email': 'godwinemmar@gmail.com', 'phone': '0718653080',
+        'contact': 'Godwin Emanuel', 'address': 'Tanzania',
+        'year_incubated': 2019,
+        'summary_source': 'BUNI in-house startup application; no company website was specified.',
+        'sections': [
+            ('Digital operations', 'The application describes digital platforms for marketing, sales, information systems, and accounting workflows. No company website was supplied for independent verification.', 'Source: BUNI in-house startup application.'),
+        ],
+    },
+    {
+        'name': 'Tukuvi Network', 'industry': 'Streaming / Media Tech',
+        'description': 'An online platform for uploading, selling, sharing, and streaming exclusive and premiere video content, including music, series, films, and documentaries.',
+        'website': 'https://tukuvi.net/',
+        'email': 'festomwangungulu@gmail.com', 'phone': '0653988999',
+        'contact': 'Festo Mwangungulu', 'address': 'Tanzania',
+        'year_incubated': 2018,
+        'summary_source': 'BUNI in-house startup application; supplied website could not be independently verified during import.',
+        'sections': [
+            ('Video platform', 'The application describes a platform for users to upload, sell, share, and stream music, series, films, and documentaries. The listed website is retained from the application, but current service availability was not verified.', 'Source: BUNI in-house startup application.'),
+        ],
+    },
+    {
+        'name': 'Impala Technologies', 'industry': 'E-commerce / Retail',
+        'description': 'An online marketplace in Tanzania for electronics, football jerseys, home appliances, and other consumer products.',
+        'website': 'https://impala.co.tz/',
+        'email': 'Jacksonmakale7@gmail.com', 'phone': '0759075719',
+        'contact': 'Jackson Makale', 'address': 'Tanzania',
+        'year_incubated': 2020,
+        'summary_source': 'BUNI in-house startup application; official marketplace: https://impala.co.tz/',
+        'sections': [
+            ('Online marketplace', 'The company website presents Impala as an online marketplace serving Tanzania, with electronics, home appliances, football jerseys, and additional product categories. Its listed customer-service phone matches the number supplied in the application.', 'Official website: https://impala.co.tz/'),
+        ],
+    },
+    {
+        'name': 'MathGenius', 'industry': 'EdTech / Tutoring',
+        'description': 'Provides mathematics clinics, one-to-one counselling, and student support for learners from primary through secondary school who are struggling with mathematics.',
+        'website': 'https://mathgenius.co.tz/',
+        'email': 'ginambuka@gmail.com', 'phone': '0756202020',
+        'contact': 'Regina Fumbuka', 'address': 'Tanzania',
+        'year_incubated': 2021,
+        'summary_source': 'BUNI in-house startup application; MathGenius Africa public company profile: https://tz.linkedin.com/company/mathgenius-africa',
+        'sections': [
+            ('Mathematics learning support', 'MathGenius Africa describes mathematics training, counselling, coaching, clinics, workshops, testing, and online-learning resources for primary and secondary students. Its stated aim is to build confidence and improve mathematics performance.', 'MathGenius Africa profile: https://tz.linkedin.com/company/mathgenius-africa'),
+        ],
+    },
+    {
+        'name': 'Lure', 'industry': 'ICT Services / Software & Marketing',
+        'description': 'An ICT company providing software development, business advisory, marketing solutions, creative production, and graphic design services.',
+        'website': 'https://www.glenrichconsultants.co.tz/',
+        'email': 'lucasdamas333@gmail.com', 'phone': '0682953193',
+        'contact': 'Lucas Damas', 'address': 'Tanzania',
+        'year_incubated': 2022,
+        'summary_source': 'BUNI in-house startup application; MIT Solve 2024 application associates Lure Inc. with its LUPIAR business marketplace solution: https://solve.mit.edu/solutions/84658',
+        'sections': [
+            ('Technology and business services', 'The application lists software development, business advisory, marketing, creative production, and graphic design. A 2024 MIT Solve submission identifies Lure Inc. as the organization behind LUPIAR, a business marketplace intended to connect businesses with opportunities. The listed company website timed out during this review.', 'BUNI in-house startup application; MIT Solve submission: https://solve.mit.edu/solutions/84658'),
+        ],
+    },
+]
