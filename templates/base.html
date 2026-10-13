@@ -40,7 +40,7 @@
                 </div>
                 {% if user.is_authenticated %}
                 <div class="nav-item">
-                    <a href="{% url 'staff:dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                    <a href="{% if user.profile.is_innovator %}{% url 'staff:account_dashboard' %}{% else %}{% url 'staff:dashboard' %}{% endif %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'account_dashboard' %}active{% endif %}">
                         <i class="fas fa-gauge-high"></i><span>My dashboard</span>
                     </a>
                 </div>
@@ -59,7 +59,17 @@
                 </div>
                 {% endif %}
 
-                <div class="nav-section">People</div>
+                <div class="nav-section">People and programmes</div>
+                <div class="nav-item">
+                    <a href="{% url 'talent_pool' %}" class="nav-link {% if request.resolver_match.url_name == 'talent_pool' %}active{% endif %}">
+                        <i class="fas fa-people-group"></i><span>Talent Pool</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a href="{% url 'innovators' %}" class="nav-link {% if request.resolver_match.url_name == 'innovators' %}active{% endif %}">
+                        <i class="fas fa-lightbulb"></i><span>Innovators</span>
+                    </a>
+                </div>
                 <div class="nav-item">
                     <a href="{% url 'staff:startups' %}" class="nav-link {% if request.resolver_match.url_name == 'startups' %}active{% endif %}">
                         <i class="fas fa-rocket"></i>
@@ -74,6 +84,13 @@
                     </a>
                 </div>
                 {% endif %}
+                {% if user.is_authenticated %}{% if user.is_superuser or user.profile.is_admin or user.profile.user_type == 'staff' %}
+                <div class="nav-item">
+                    <a href="{% url 'staff:innovator_management' %}" class="nav-link {% if request.resolver_match.url_name == 'innovator_management' or request.resolver_match.url_name == 'innovator_management_edit' %}active{% endif %}">
+                        <i class="fas fa-user-lock"></i><span>Innovator records</span>
+                    </a>
+                </div>
+                {% endif %}{% endif %}
                 <div class="nav-item">
                     <a href="{% url 'impact_explorer' %}" class="nav-link {% if request.resolver_match.url_name == 'impact_explorer' %}active{% endif %}">
                         <i class="fas fa-chart-column"></i><span>Impact by year</span>
@@ -173,6 +190,7 @@
                         <div class="sidebar-user-role">
                             {% if user.profile.is_admin %}Hub Admin
                             {% elif user.profile.user_type == 'staff' %}DTBi Staff
+                            {% elif user.profile.is_innovator %}Innovator
                             {% elif user.profile.startup %}{{ user.profile.startup.name }}
                             {% else %}Startup Owner{% endif %}
                         </div>

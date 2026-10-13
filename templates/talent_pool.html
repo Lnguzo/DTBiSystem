@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Talent Pool | DTBi &amp; BUNI{% endblock %}
+{% block page_title %}Talent Pool{% endblock %}
+
+{% block content %}
+<main class="talent-page">
+    {% if featured_cohort %}
+    <section class="talent-hero">
+        <div class="talent-hero-copy">
+            <span class="talent-eyebrow"><i class="fas fa-people-group" aria-hidden="true"></i> BUNI and DTBi programme archive</span>
+            <span class="talent-status">{{ featured_cohort.get_status_display }}</span>
+            <h1>{{ featured_cohort.title }}</h1>
+            <p class="talent-summary">{{ featured_cohort.summary }}</p>
+            <p class="talent-hero-description">{{ featured_cohort.description }}</p>
+            {% if featured_cohort.article_url %}
+            <a class="talent-button" href="{{ featured_cohort.article_url }}" target="_blank" rel="noopener noreferrer">Read the programme story <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+            {% endif %}
+        </div>
+        {% if featured_cohort.hero_image %}
+        <img class="talent-hero-image" src="{{ featured_cohort.hero_image.url }}" alt="{{ featured_cohort.title }} participants and programme team">
+        {% elif featured_cohort.hero_image_path %}
+        <img class="talent-hero-image" src="{% static featured_cohort.hero_image_path %}" alt="{{ featured_cohort.title }} participants and programme team">
+        {% endif %}
+    </section>
+
+    <section class="talent-facts" aria-label="Programme facts">
+        <article><strong>{{ featured_cohort.duration_weeks }}</strong><span>weeks of practical learning</span></article>
+        {% if featured_cohort.participant_count %}<article><strong>{{ featured_cohort.participant_count }}</strong><span>young participants</span></article>{% endif %}
+        <article><strong>Demo Day</strong><span>participants pitched their projects to stakeholders</span></article>
+        {% if featured_cohort.award_winning_teams %}<article><strong>{{ featured_cohort.award_winning_teams }} teams</strong><span>received awards after the group challenge</span></article>{% endif %}
+    </section>
+
+    <section class="talent-content-grid">
+        <article class="talent-panel talent-focus-panel">
+            <span class="talent-section-kicker">What participants worked on</span>
+            <h2>Learning by building</h2>
+            <p>{{ featured_cohort.programme_structure }}</p>
+            <ul class="talent-focus-list">
+                {% for area in cohort_focus_areas %}<li><i class="fas fa-check" aria-hidden="true"></i>{{ area }}</li>{% endfor %}
+            </ul>
+        </article>
+        <article class="talent-panel talent-partners-panel">
+            <span class="talent-section-kicker">Delivered together</span>
+            <h2>Programme partners</h2>
+            <ul class="talent-partner-list">
+                {% for partner in cohort_partners %}<li><span>{{ forloop.counter|stringformat:"02d" }}</span>{{ partner }}</li>{% endfor %}
+            </ul>
+        </article>
+    </section>
+
+    {% for event in featured_cohort.events.all %}
+    <section class="talent-event" id="talent-pool-demo-day">
+        <div class="talent-section-heading">
+            <div><span class="talent-section-kicker">Programme highlight</span><h2>{{ event.title }}</h2></div>
+            {% if event.location %}<span class="talent-event-location"><i class="fas fa-location-dot" aria-hidden="true"></i>{{ event.location }}</span>{% endif %}
+        </div>
+        <div class="talent-event-copy">
+            <p>{{ event.description }}</p>
+            {% if event.guest_of_honour %}<p class="talent-guest"><i class="fas fa-star" aria-hidden="true"></i><span><b>Guest of Honour</b>{{ event.guest_of_honour }}</span></p>{% endif %}
+        </div>
+        {% if event.video_file or event.video_embed_url %}
+        <div class="talent-video-wrap">
+            <span class="talent-section-kicker">Watch a programme moment</span>
+            {% if event.video_file %}
+            <video controls playsinline preload="metadata" aria-label="{{ event.title }} video"><source src="{{ event.video_file.url }}">Your browser does not support video playback.</video>
+            {% else %}
+            <div class="talent-video-frame"><iframe src="{{ event.video_embed_url }}" title="{{ event.title }} video" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if event.photos.all %}
+        <div class="talent-gallery-heading"><div><span class="talent-section-kicker">The programme in pictures</span><h2>Eight weeks, shared together</h2></div><span>{{ event.photos.all|length }} photos</span></div>
+        <div class="talent-gallery">
+            {% for photo in event.photos.all %}
+            {% if photo.image %}<a class="talent-photo" href="{{ photo.image.url }}" target="_blank" rel="noopener noreferrer"><img src="{{ photo.image.url }}" alt="{{ photo.alt_text }}" loading="lazy"><span>{{ photo.caption }}</span></a>
+            {% elif photo.image_path %}<a class="talent-photo" href="{% static photo.image_path %}" target="_blank" rel="noopener noreferrer"><img src="{% static photo.image_path %}" alt="{{ photo.alt_text }}" loading="lazy"><span>{{ photo.caption }}</span></a>{% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+    {% endfor %}
+
+    <section class="talent-outcomes">
+        <span class="talent-section-kicker">What the cohort achieved</span><h2>From learning to a public pitch</h2><p>{{ featured_cohort.outcomes }}</p>
+    </section>
+
+    <section class="talent-infographic">
+        <div><span class="talent-section-kicker">Programme at a glance</span><h2>A practical eight-week journey</h2><p>The supplied programme overview describes the cohort’s partners, focus, structure, and Demo Day.</p></div>
+        <img src="{% static 'img/talent-pool/2026/programme-overview.png' %}" alt="Talent Pool 2026 overview showing the programme partners, focus areas, eight-week structure, and Demo Day">
+    </section>
+
+    {% if archived_cohorts %}
+    <section class="talent-archive">
+        <div class="talent-section-heading"><div><span class="talent-section-kicker">Programme archive</span><h2>More Talent Pool cohorts</h2></div></div>
+        <div class="talent-archive-grid">{% for cohort in archived_cohorts %}<a href="?cohort={{ cohort.slug }}"><span>{{ cohort.year }} · {{ cohort.get_status_display }}</span><h3>{{ cohort.title }}</h3><p>{{ cohort.summary }}</p></a>{% endfor %}</div>
+    </section>
+    {% endif %}
+    {% else %}
+    <section class="talent-empty"><span class="talent-section-kicker">BUNI and DTBi programme archive</span><h1>Talent Pool</h1><p>Programme cohorts, practical learning, participant stories, event photos, and videos will appear here as they are published.</p></section>
+    {% endif %}
+</main>
+{% endblock %}

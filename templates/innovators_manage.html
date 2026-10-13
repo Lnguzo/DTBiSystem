@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Innovator Records | DTBi{% endblock %}
+{% block page_title %}Innovator Records{% endblock %}
+
+{% block content %}
+<main class="innovators-page">
+    <section class="innovators-hero">
+        <div><span class="talent-section-kicker"><i class="fas fa-user-lock" aria-hidden="true"></i> Staff and admin workspace</span><h1>Innovator records</h1><p>Manage the public project profiles and confidential contact and programme information. Phone numbers and internal milestones are available only in this signed-in workspace and to the linked innovator.</p></div>
+        <div class="innovators-count"><strong>{{ innovator_count }}</strong><span>records in this view</span></div>
+    </section>
+    <form class="innovators-filters" method="get"><label class="innovator-search"><span class="sr-only">Search innovator records</span><i class="fas fa-magnifying-glass" aria-hidden="true"></i><input type="search" name="q" value="{{ query }}" placeholder="Search innovator, project, or email"></label><button class="talent-button" type="submit">Search records</button>{% if query %}<a class="innovator-reset" href="{% url 'staff:innovator_management' %}">Clear</a>{% endif %}</form>
+    <div class="table-wrap card"><table><thead><tr><th>Innovator and project</th><th>Login</th><th>Private contact</th><th>Entry period</th><th>Programme record</th><th>Action</th></tr></thead><tbody>
+    {% for innovator in innovators %}<tr><td><strong>{{ innovator.innovator_name }}</strong><br>{{ innovator.project_name }}<br><span class="text-muted">{{ innovator.get_catalogue_display }} · {% if innovator.is_published %}Public profile{% else %}Unpublished{% endif %}</span></td><td>{% if innovator.user %}{{ innovator.user.username }}{% else %}<span class="text-muted">No login linked</span>{% endif %}</td><td>{{ innovator.contact_email|default:'-' }}<br><strong>{{ innovator.phone_number|default:'No phone provided' }}</strong></td><td>{{ innovator.entry_period|default:'-' }}</td><td><details><summary>View private milestones and notes</summary><div class="innovator-private-data">{% if innovator.milestones_text %}<strong>Milestones and status</strong><p>{{ innovator.milestones_text|linebreaksbr }}</p>{% endif %}{% if innovator.programme_remarks %}<strong>Remarks</strong><p>{{ innovator.programme_remarks }}</p>{% endif %}{% if innovator.staff_recommendation %}<strong>Staff recommendation</strong><p>{{ innovator.staff_recommendation }}</p>{% endif %}{% if not innovator.milestones_text and not innovator.programme_remarks and not innovator.staff_recommendation %}<p>No programme details were supplied.</p>{% endif %}</div></details></td><td><a class="btn btn-outline btn-sm" href="{% url 'staff:innovator_management_edit' innovator.pk %}">Edit record</a></td></tr>
+    {% empty %}<tr><td colspan="6">No Innovator profiles match this search.</td></tr>{% endfor %}
+    </tbody></table></div>
+</main>
+{% endblock %}

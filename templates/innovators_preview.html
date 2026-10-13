@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Innovators | DTBi &amp; BUNI{% endblock %}
+{% block page_title %}Innovators{% endblock %}
+
+{% block content %}
+<main class="innovators-page">
+    <section class="innovators-hero">
+        <div>
+            <span class="talent-section-kicker"><i class="fas fa-lightbulb" aria-hidden="true"></i> Tanzania's agricultural innovation community</span>
+            <h1>Innovators</h1>
+            <p>Meet the people behind practical ideas for agriculture and food systems. Browse projects from the AgriTech and Food Systems list and the MAKISATU Innovation Catalogue.</p>
+        </div>
+        <div class="innovators-count"><strong>{{ innovator_count }}</strong><span>projects in this view</span></div>
+    </section>
+
+    <form class="innovators-filters" method="get" action="{% url 'innovators' %}">
+        <label class="innovator-search"><span class="sr-only">Search innovators and projects</span><i class="fas fa-magnifying-glass" aria-hidden="true"></i><input type="search" name="q" value="{{ innovator_query }}" placeholder="Search by innovator, project, or topic"></label>
+        <label class="innovator-catalogue"><span class="sr-only">Filter by catalogue</span><select name="catalogue" aria-label="Filter by catalogue"><option value="">All catalogues</option><option value="agritech" {% if selected_catalogue == 'agritech' %}selected{% endif %}>AgriTech &amp; Food Systems</option><option value="makisatu" {% if selected_catalogue == 'makisatu' %}selected{% endif %}>MAKISATU Catalogue</option></select></label>
+        <button type="submit" class="talent-button">Find projects</button>
+        {% if innovator_query or selected_catalogue %}<a class="innovator-reset" href="{% url 'innovators' %}">Clear</a>{% endif %}
+    </form>
+
+    {% if innovator_profiles %}
+    <section class="innovator-grid" aria-label="Innovator profiles">
+        {% for innovator in innovator_profiles %}
+        <article class="innovator-card">
+            <a class="innovator-card-main" href="{% url 'innovator_profile' slug=innovator.slug %}">
+                <div class="innovator-card-art">
+                    {% if innovator.image %}<img src="{{ innovator.image.url }}" alt="{{ innovator.project_name }}">
+                    {% elif innovator.image_path %}<img src="{% static innovator.image_path %}" alt="{{ innovator.project_name }}">
+                    {% else %}<i class="fas fa-seedling" aria-hidden="true"></i>{% endif %}
+                </div>
+                <span class="innovator-tag">{{ innovator.get_catalogue_display }}</span>
+                <h2>{{ innovator.project_name }}</h2>
+                <span class="innovator-byline">{{ innovator.innovator_name }}</span>
+                <p>{{ innovator.description|truncatechars:180 }}</p>
+                <span class="innovator-more">View innovator profile <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+            </a>
+        </article>
+        {% endfor %}
+    </section>
+    {% else %}
+    <section class="innovator-no-results"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><h2>No projects found</h2><p>Try another name or choose a different catalogue.</p><a href="{% url 'innovators' %}">Show all innovators</a></section>
+    {% endif %}
+
+    <p class="innovators-note">Some entries only had a name and project title in the supplied catalogue. Where a reliable public source was available, it was used to add context. Details not available from the sources are identified in the profile so they can be completed with the innovator.</p>
+</main>
+{% endblock %}

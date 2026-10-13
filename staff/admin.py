@@ -8,6 +8,8 @@ from .models import (
     ParticipantJourney, ParticipantJourneyHistory, ParticipantSupport,
     ParticipantFollowUp, ParticipantFollowUpHistory, ParticipantOutcome,
     StartupInquiry, StartupPublicSection, StartupStorySlide, StartupTeamMember,
+    TalentPoolCohort, TalentPoolEvent, TalentPoolPhoto,
+    InnovatorProfile,
 )
 
 
@@ -294,3 +296,63 @@ class StartupInquiryAdmin(admin.ModelAdmin):
     search_fields = ('startup__name', 'subject', 'sender_name', 'organization', 'sender_email', 'message')
     readonly_fields = ('created_at',)
     list_editable = ('status',)
+
+
+class TalentPoolEventInline(admin.TabularInline):
+    model = TalentPoolEvent
+    extra = 0
+    fields = ('title', 'event_type', 'event_date', 'location', 'is_published', 'sort_order')
+
+
+class TalentPoolPhotoInline(admin.TabularInline):
+    model = TalentPoolPhoto
+    extra = 0
+    fields = ('image', 'image_path', 'caption', 'alt_text', 'sort_order')
+
+
+@admin.register(TalentPoolCohort)
+class TalentPoolCohortAdmin(admin.ModelAdmin):
+    list_display = ('title', 'year', 'status', 'participant_count', 'is_featured', 'is_published')
+    list_filter = ('year', 'status', 'is_published')
+    search_fields = ('title', 'summary', 'description', 'partners')
+    prepopulated_fields = {'slug': ('title',)}
+    list_editable = ('status', 'is_featured', 'is_published')
+    inlines = (TalentPoolEventInline,)
+    fieldsets = (
+        ('Programme', {'fields': ('title', 'slug', 'year', 'summary', 'description', 'status')}),
+        ('Programme details', {'fields': ('duration_weeks', 'participant_count', 'award_winning_teams', 'partners', 'focus_areas', 'programme_structure', 'outcomes')}),
+        ('Public page and media', {'fields': ('article_url', 'hero_image', 'hero_image_path', 'is_featured', 'is_published', 'sort_order')}),
+    )
+
+
+@admin.register(TalentPoolEvent)
+class TalentPoolEventAdmin(admin.ModelAdmin):
+    list_display = ('title', 'cohort', 'event_type', 'event_date', 'is_published')
+    list_filter = ('event_type', 'is_published', 'cohort__year')
+    search_fields = ('title', 'description', 'cohort__title', 'guest_of_honour')
+    list_editable = ('is_published',)
+    inlines = (TalentPoolPhotoInline,)
+
+
+@admin.register(TalentPoolPhoto)
+class TalentPoolPhotoAdmin(admin.ModelAdmin):
+    list_display = ('caption', 'event', 'sort_order')
+    list_filter = ('event__cohort__year', 'event')
+    search_fields = ('caption', 'alt_text', 'event__title', 'event__cohort__title')
+    list_editable = ('sort_order',)
+
+
+@admin.register(InnovatorProfile)
+class InnovatorProfileAdmin(admin.ModelAdmin):
+    list_display = ('project_name', 'innovator_name', 'user', 'catalogue', 'is_published', 'sort_order')
+    list_filter = ('catalogue', 'is_published')
+    search_fields = ('innovator_name', 'project_name', 'description', 'contact_email')
+    prepopulated_fields = {'slug': ('project_name',)}
+    list_editable = ('is_published', 'sort_order')
+    fieldsets = (
+        ('Innovator and project', {'fields': ('innovator_name', 'project_name', 'slug', 'catalogue', 'description')}),
+        ('Private innovator and programme data', {'fields': ('user', 'contact_email', 'phone_number', 'entry_period', 'milestones_text', 'programme_remarks', 'staff_recommendation')}),
+        ('Public references', {'fields': ('website', 'source_url')}),
+        ('Profile image', {'fields': ('image', 'image_path')}),
+        ('Publishing', {'fields': ('is_published', 'sort_order')}),
+    )

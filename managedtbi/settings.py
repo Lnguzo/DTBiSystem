@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -82,7 +83,11 @@ WSGI_APPLICATION = 'managedtbi.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        # Keep the local copy (which contains private Innovator contact data)
+        # when present. Fresh checkouts fall back to the repository database.
+        'NAME': Path(os.environ.get('DTBI_DATABASE_NAME', '')) if os.environ.get('DTBI_DATABASE_NAME') else (
+            BASE_DIR / 'db.local.sqlite3' if (BASE_DIR / 'db.local.sqlite3').exists() else BASE_DIR / 'db.sqlite3'
+        ),
     }
 }
 

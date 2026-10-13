@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Edit Innovator Record | DTBi{% endblock %}
+{% block page_title %}Edit Innovator Record{% endblock %}
+{% block content %}
+<main class="innovators-page innovator-detail-page">
+    <a class="innovator-back" href="{% url 'staff:innovator_management' %}"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to Innovator records</a>
+    <section class="card"><div class="card-header"><div><span class="talent-section-kicker">Staff and admin only</span><h1>Edit {{ innovator.innovator_name }}</h1></div></div><div class="card-body">
+        <p class="dashboard-private-note">The phone number, milestones, remarks, and recommendation are confidential. They are hidden from public Innovator profiles.</p>
+        <form method="post">{% csrf_token %}{% if form.non_field_errors %}<div class="error-list">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}<div class="form-group"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-help">{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<small class="form-help" style="color:#b91c1c">{{ error }}</small>{% endfor %}</div>{% endfor %}
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><button class="btn btn-primary" type="submit">Save Innovator record</button><a class="btn btn-outline" href="{% url 'staff:innovator_management' %}">Cancel</a></div>
+        </form>
+    </div></section>
+</main>
+{% endblock %}
