@@ -246,7 +246,7 @@ def settings_view(request):
 def landing(request):
     """Public system overview with live platform statistics."""
     search_query = request.GET.get('q', '').strip()
-    startup_results = Startup.objects.filter(status='active', directory_visible=True)
+    startup_results = Startup.objects.filter(directory_visible=True, status__in=('active', 'pending'))
     if search_query:
         startup_results = startup_results.filter(
             Q(name__icontains=search_query)
@@ -255,7 +255,7 @@ def landing(request):
         )
 
     system_stats = {
-        'startups': Startup.objects.filter(status='active', directory_visible=True).count(),
+        'startups': Startup.objects.filter(directory_visible=True, status__in=('active', 'pending')).count(),
         'mentors': Mentor.objects.filter(is_active=True).count(),
         'investors': Investor.objects.filter(status='active').count(),
         'founders': Founder.objects.count(),

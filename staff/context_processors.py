@@ -4,7 +4,7 @@ from .models import Investor, Mentor, PageVisit, Partnership, Startup, UserProfi
 def people_counts(request):
     return {
         'live_counts': {
-            'startups': Startup.objects.filter(status='active', directory_visible=True).count(),
+            'startups': Startup.objects.filter(directory_visible=True, status__in=('active', 'pending')).count(),
             'mentors': Mentor.objects.filter(is_active=True).count(),
             'investors': Investor.objects.filter(status='active').count(),
         }

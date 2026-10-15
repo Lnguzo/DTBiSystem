@@ -990,6 +990,18 @@ class YcDirectoryPageTests(TestCase):
         self.assertIn(pending, response.context['startup_list'].object_list)
         self.assertContains(response, 'Pending Catalogue Startup')
 
+    def test_public_startup_counts_include_pending_directory_entries(self):
+        Startup.objects.create(name='Pending Count Startup', status='pending')
+        expected = Startup.objects.filter(
+            directory_visible=True, status__in=('active', 'pending'),
+        ).count()
+
+        response = self.client.get(reverse('landing'))
+
+        self.assertEqual(response.context['system_stats']['startups'], expected)
+        self.assertEqual(response.context['live_counts']['startups'], expected)
+        self.assertContains(response, 'Active and pending venture profiles')
+
     def test_empty_state_renders_without_spotlight(self):
         Startup.objects.all().delete()
         response = self.client.get(reverse('staff:startups'))
