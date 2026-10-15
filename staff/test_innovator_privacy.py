@@ -90,6 +90,7 @@ class TalentPoolPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Talent Pool participants during a learning session')
         self.assertContains(response, 'talent-pool-2026-participants-session.jpg')
+        self.assertNotContains(response, 'Programme at a glance')
 
     def test_published_cohort_event_and_gallery_render(self):
         cohort = TalentPoolCohort.objects.create(
