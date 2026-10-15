@@ -45,6 +45,11 @@
     <section class="innovator-no-results"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><h2>No projects found</h2><p>Try another name or choose a different catalogue.</p><a href="{% url 'innovators' %}">Show all innovators</a></section>
     {% endif %}
 
-    <p class="innovators-note">Some entries only had a name and project title in the supplied catalogue. Where a reliable public source was available, it was used to add context. Details not available from the sources are identified in the profile so they can be completed with the innovator.</p>
+    {% include "partials/pagination.html" %}
+
+    <section class="ecosystem-cta" aria-label="Explore more of the DTBi and BUNI community">
+        <div><span class="talent-section-kicker">Keep exploring</span><h2>Ideas grow through connection</h2><p>Explore BUNI's learning programmes or browse startups building solutions across Tanzania.</p></div>
+        <div class="ecosystem-cta-links"><a class="talent-button" href="{% url 'talent_pool' %}">Explore Talent Pool <i class="fas fa-arrow-right" aria-hidden="true"></i></a><a class="ecosystem-cta-secondary" href="{% url 'staff:startups' %}">Browse startups</a></div>
+    </section>
 </main>
 {% endblock %}

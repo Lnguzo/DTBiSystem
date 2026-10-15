@@ -308,11 +308,17 @@ def innovators_preview(request):
             | Q(project_name__icontains=query)
             | Q(description__icontains=query)
         )
+    page_obj = Paginator(profiles, 12).get_page(request.GET.get('page'))
+    page_query = urlencode({
+        key: value for key, value in {'q': query, 'catalogue': catalogue}.items() if value
+    })
     return render(request, 'innovators_preview.html', {
-        'innovator_profiles': profiles,
+        'innovator_profiles': page_obj.object_list,
         'innovator_count': profiles.count(),
         'innovator_query': query,
         'selected_catalogue': catalogue,
+        'page_obj': page_obj,
+        'page_query': page_query,
     })
 
 

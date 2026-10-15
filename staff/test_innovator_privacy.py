@@ -36,6 +36,29 @@ class InnovatorPrivacyTests(TestCase):
         self.assertEqual(profile.status_code, 200)
         self.assertNotContains(directory, 'PRIVATE-PHONE-ALPHA')
         self.assertNotContains(profile, 'PRIVATE-PHONE-ALPHA')
+        self.assertNotContains(directory, 'Some entries only had a name')
+        self.assertContains(directory, 'Explore Talent Pool')
+
+    def test_innovator_directory_paginates_12_and_keeps_filters(self):
+        for index in range(13):
+            self.make_innovator(
+                name=f'Test Innovator {index}',
+                project=f'Test Project {index}',
+                slug=f'test-project-{index}',
+                phone='',
+            )
+
+        query = {'q': 'Test Innovator', 'catalogue': 'makisatu'}
+        first_page = self.client.get(reverse('innovators'), query)
+        second_page = self.client.get(reverse('innovators'), {**query, 'page': '2'})
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.context['page_obj'].paginator.count, 13)
+        self.assertEqual(len(first_page.context['innovator_profiles']), 12)
+        self.assertContains(first_page, 'Page 1 of 2')
+        self.assertContains(first_page, 'catalogue=makisatu&amp;page=2')
+        self.assertEqual(len(second_page.context['innovator_profiles']), 1)
+        self.assertEqual(second_page.context['page_obj'].number, 2)
 
     def test_innovator_dashboard_only_shows_records_linked_to_that_account(self):
         innovator_user = self.make_user('innovator-one', 'innovator')
@@ -91,6 +114,7 @@ class TalentPoolPageTests(TestCase):
         self.assertContains(response, 'Talent Pool participants during a learning session')
         self.assertContains(response, 'talent-pool-2026-participants-session.jpg')
         self.assertNotContains(response, 'Programme at a glance')
+        self.assertContains(response, 'Meet the innovators')
 
     def test_published_cohort_event_and_gallery_render(self):
         cohort = TalentPoolCohort.objects.create(
@@ -122,3 +146,4 @@ class TalentPoolPageTests(TestCase):
         self.assertContains(response, 'Sample Talent Pool')
         self.assertContains(response, 'Sample Demo Day')
         self.assertContains(response, 'Sample event photo')
+        self.assertContains(response, 'Meet the innovators')

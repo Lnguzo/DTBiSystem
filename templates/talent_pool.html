@@ -96,5 +96,10 @@
     {% else %}
     <section class="talent-empty"><span class="talent-section-kicker">BUNI and DTBi programme archive</span><h1>Talent Pool</h1><p>Programme cohorts, practical learning, participant stories, event photos, and videos will appear here as they are published.</p></section>
     {% endif %}
+
+    <section class="ecosystem-cta" aria-label="Explore more of the DTBi and BUNI community">
+        <div><span class="talent-section-kicker">Discover more</span><h2>See where ideas go next</h2><p>Meet innovators and explore startups developing practical solutions in Tanzania.</p></div>
+        <div class="ecosystem-cta-links"><a class="talent-button" href="{% url 'innovators' %}">Meet the innovators <i class="fas fa-arrow-right" aria-hidden="true"></i></a><a class="ecosystem-cta-secondary" href="{% url 'staff:startups' %}">Browse startups</a></div>
+    </section>
 </main>
 {% endblock %}
