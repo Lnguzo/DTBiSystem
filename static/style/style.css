@@ -2036,6 +2036,7 @@ table tbody tr:last-child td { border-bottom: none; }
 .overview-hero-slideshow img:nth-of-type(2) { object-position: center 15%; }
 .overview-hero-slideshow img:nth-of-type(3) { object-position: center 18%; }
 .overview-hero-slideshow img:nth-of-type(4) { object-position: center 12%; }
+.overview-hero-slideshow img:nth-of-type(5) { object-position: center 48%; }
 .overview-hero-slideshow img.is-active {
   opacity: 0.9;
   animation: ken-burns 9s var(--ease-out) both;

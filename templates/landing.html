@@ -17,6 +17,7 @@
                 <img src="{% static 'img/brands/staff1.jpeg' %}" alt="">
                 <img src="{% static 'img/brands/staff2.jpeg' %}" alt="">
                 <img src="{% static 'img/brands/staff3.jpeg' %}" alt="">
+                <img src="{% static 'img/brands/dtbi-overview.jpg' %}" alt="">
             </div>
             <div class="hero-grid" aria-hidden="true"></div>
             <canvas class="ambient-field ambient-field-hero" aria-hidden="true"></canvas>
@@ -171,7 +172,7 @@
                 heroImages[activeImage].classList.remove('is-active');
                 activeImage = (activeImage + 1) % heroImages.length;
                 heroImages[activeImage].classList.add('is-active');
-            }, 2500);
+            }, 1000);
         }
 
         const countNodes = document.querySelectorAll('[data-visitor-count]');
