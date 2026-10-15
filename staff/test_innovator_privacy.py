@@ -84,6 +84,13 @@ class InnovatorPrivacyTests(TestCase):
 
 
 class TalentPoolPageTests(TestCase):
+    def test_participant_session_photo_is_shown_on_talent_pool_page(self):
+        response = self.client.get(reverse('talent_pool'), {'cohort': 'talent-pool-2026'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Talent Pool participants during a learning session')
+        self.assertContains(response, 'talent-pool-2026-participants-session.jpg')
+
     def test_published_cohort_event_and_gallery_render(self):
         cohort = TalentPoolCohort.objects.create(
             title='Sample Talent Pool',
