@@ -113,6 +113,8 @@ class TalentPoolPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Talent Pool participants during a learning session')
         self.assertContains(response, 'talent-pool-2026-participants-session.jpg')
+        self.assertContains(response, '16 photos')
+        self.assertNotContains(response, 'Talent Pool Participant Session')
         self.assertNotContains(response, 'Programme at a glance')
         self.assertContains(response, 'Meet the innovators')
 

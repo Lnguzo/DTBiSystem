@@ -51,7 +51,7 @@
     </section>
 
     {% for event in featured_cohort.events.all %}
-    <section class="talent-event" id="talent-pool-demo-day">
+    <section class="talent-event" id="talent-pool-event-{{ event.pk }}">
         <div class="talent-section-heading">
             <div><span class="talent-section-kicker">Programme highlight</span><h2>{{ event.title }}</h2></div>
             {% if event.location %}<span class="talent-event-location"><i class="fas fa-location-dot" aria-hidden="true"></i>{{ event.location }}</span>{% endif %}
