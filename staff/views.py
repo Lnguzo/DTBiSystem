@@ -516,7 +516,9 @@ def startups(request):
     )
     is_admin = request.user.is_authenticated and (request.user.is_superuser or get_profile(request.user).is_admin)
     if not is_admin:
-        startup_list = startup_list.filter(status='active')
+        # Pending entries imported by staff are directory-visible as catalogue
+        # records too; inactive startups remain excluded from public listings.
+        startup_list = startup_list.filter(status__in=('active', 'pending'))
     startup_list = startup_list.order_by('industry', 'name')
     startup_type = request.GET.get('type', '').strip().lower()
     if startup_type not in {'public', 'individual'}:
