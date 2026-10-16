@@ -11,7 +11,7 @@ from django.contrib.auth import login, authenticate, logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.utils import timezone
 from django.utils.http import urlencode, url_has_allowed_host_and_scheme
 from django.utils.text import slugify
@@ -22,15 +22,17 @@ from .models import (
     Startup, Founder, Opportunity, Funding,
     KPI, PitchDeck, ServiceOffered, Partnership, PartnershipHistory,
     UserProfile, RegistrationRate, ProfileView, LoginNotification, SiteVisit, PageVisit, StartupInquiry,
-    Mentor, Investor
+    Mentor, Investor, TalentPoolCohort, TalentPoolEvent, InnovatorProfile,
 )
 from .forms import (
     StartupForm, StartupOwnerForm, FounderFormSet, OpportunityFormSet,
     FundingFormSet, KPIFormSet, PitchDeckFormSet,
     ServiceOfferedFormSet, PartnershipForm, AccountForm,
     ProfilePreferencesForm, MentorForm, InvestorForm, ManagedUserForm, StartupInquiryForm,
+    InnovatorManagementForm,
 )
 from .data_views import record_page_visit
+from .innovator_reports import public_innovator_queryset, innovators_export
 from .startup_filters import (
     STARTUP_INDUSTRY_CATEGORIES,
     apply_startup_directory_filters,
@@ -245,7 +247,7 @@ def settings_view(request):
 def landing(request):
     """Public system overview with live platform statistics."""
     search_query = request.GET.get('q', '').strip()
-    startup_results = Startup.objects.filter(status='active', directory_visible=True)
+    startup_results = Startup.objects.filter(directory_visible=True, status__in=('active', 'pending'))
     if search_query:
         startup_results = startup_results.filter(
             Q(name__icontains=search_query)
@@ -254,7 +256,7 @@ def landing(request):
         )
 
     system_stats = {
-        'startups': Startup.objects.filter(status='active', directory_visible=True).count(),
+        'startups': Startup.objects.filter(directory_visible=True, status__in=('active', 'pending')).count(),
         'mentors': Mentor.objects.filter(is_active=True).count(),
         'investors': Investor.objects.filter(status='active').count(),
         'founders': Founder.objects.count(),
@@ -270,6 +272,92 @@ def landing(request):
         'visitor_counts': get_visitor_counts(),
         'system_stats': system_stats,
         'upcoming_opportunities': upcoming_opportunities,
+        'featured_talent_pool': TalentPoolCohort.objects.filter(is_published=True, is_featured=True).first(),
+    })
+
+
+def talent_pool(request):
+    """Public archive of published Talent Pool programmes and event media."""
+    published_events = TalentPoolEvent.objects.filter(is_published=True).prefetch_related('photos')
+    cohorts = TalentPoolCohort.objects.filter(is_published=True).prefetch_related(
+        Prefetch('events', queryset=published_events)
+    )
+    requested_slug = request.GET.get('cohort', '').strip()
+    selected_cohort = cohorts.filter(slug=requested_slug).first() if requested_slug else None
+    featured_cohort = selected_cohort or cohorts.filter(is_featured=True).first() or cohorts.first()
+    archived_cohorts = cohorts.exclude(pk=featured_cohort.pk) if featured_cohort else cohorts.none()
+    partners = featured_cohort.partners.splitlines() if featured_cohort and featured_cohort.partners else []
+    focus_areas = featured_cohort.focus_areas.splitlines() if featured_cohort and featured_cohort.focus_areas else []
+    return render(request, 'talent_pool.html', {
+        'featured_cohort': featured_cohort,
+        'archived_cohorts': archived_cohorts,
+        'cohort_partners': [item.strip() for item in partners if item.strip()],
+        'cohort_focus_areas': [item.strip() for item in focus_areas if item.strip()],
+    })
+
+
+def innovators_preview(request):
+    """Public directory of innovators and their agriculture and food-system projects."""
+    query = request.GET.get('q', '').strip()
+    catalogue = request.GET.get('catalogue', '').strip()
+    profiles = public_innovator_queryset(request.GET)
+    page_obj = Paginator(profiles, 12).get_page(request.GET.get('page'))
+    page_query = urlencode({
+        key: value for key, value in {'q': query, 'catalogue': catalogue}.items() if value
+    })
+    return render(request, 'innovators_preview.html', {
+        'innovator_profiles': page_obj.object_list,
+        'innovator_count': profiles.count(),
+        'innovator_query': query,
+        'selected_catalogue': catalogue,
+        'page_obj': page_obj,
+        'page_query': page_query,
+        'export_query': urlencode({
+            key: value for key, value in {'q': query, 'catalogue': catalogue}.items() if value
+        }),
+    })
+
+
+def innovator_profile(request, slug):
+    """Show the full public record for one innovator and their project."""
+    profile = get_object_or_404(InnovatorProfile, slug=slug, is_published=True)
+    return render(request, 'innovator_profile.html', {'innovator': profile})
+
+
+@login_required
+@require_http_methods(['GET'])
+def innovator_management(request):
+    """Staff workspace for the confidential innovator programme records."""
+    _require_account_admin(request, allow_staff=True)
+    query = request.GET.get('q', '').strip()
+    profiles = InnovatorProfile.objects.select_related('user').order_by('innovator_name', 'project_name')
+    if query:
+        profiles = profiles.filter(
+            Q(innovator_name__icontains=query)
+            | Q(project_name__icontains=query)
+            | Q(contact_email__icontains=query)
+        )
+    return render(request, 'innovators_manage.html', {
+        'innovators': profiles,
+        'innovator_count': profiles.count(),
+        'query': query,
+    })
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def innovator_management_edit(request, pk):
+    """Allow DTBi staff/admin to update public and confidential innovator data."""
+    _require_account_admin(request, allow_staff=True)
+    innovator = get_object_or_404(InnovatorProfile.objects.select_related('user'), pk=pk)
+    form = InnovatorManagementForm(request.POST or None, instance=innovator)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, f'Updated the record for {innovator.innovator_name}.')
+        return redirect('staff:innovator_management')
+    return render(request, 'innovator_manage_edit.html', {
+        'innovator': innovator,
+        'form': form,
     })
 
 
@@ -424,7 +512,9 @@ def startups(request):
     )
     is_admin = request.user.is_authenticated and (request.user.is_superuser or get_profile(request.user).is_admin)
     if not is_admin:
-        startup_list = startup_list.filter(status='active')
+        # Pending entries imported by staff are directory-visible as catalogue
+        # records too; inactive startups remain excluded from public listings.
+        startup_list = startup_list.filter(status__in=('active', 'pending'))
     startup_list = startup_list.order_by('industry', 'name')
     startup_type = request.GET.get('type', '').strip().lower()
     if startup_type not in {'public', 'individual'}:
@@ -546,6 +636,8 @@ def user_login(request):
             return redirect('mentor_profile', pk=user.mentor_record.pk)
         if profile.user_type == 'investor' and hasattr(user, 'investor_record'):
             return redirect('investor_profile', pk=user.investor_record.pk)
+        if profile.is_innovator and user.innovator_profiles.exists():
+            return redirect('staff:account_dashboard')
         if profile.is_startup:
             return redirect('staff:startup_profile', slug=profile.startup.slug) if profile.startup else redirect('staff:startup_create')
         return redirect('staff:dashboard')
@@ -587,11 +679,13 @@ def dashboard(request):
                 'mentors_demo': Mentor.objects.filter(is_active=True).count() > 0 and not Mentor.objects.filter(is_active=True).exclude(source__startswith='DEMO ONLY').exists(),
                 'investors': Investor.objects.filter(status='active').count(),
                 'investors_demo': Investor.objects.filter(status='active').count() > 0 and not Investor.objects.filter(status='active').exclude(source__startswith='DEMO ONLY').exists(),
+                'innovators': InnovatorProfile.objects.count(),
             },
         })
     elif profile.user_type == 'staff':
         from .models import MentorEngagement, ParticipantFollowUp, ParticipantJourney, Partnership
         context.update({
+            'innovator_count': InnovatorProfile.objects.count(),
             'staff_operations': {
                 'assigned_journeys': ParticipantJourney.objects.filter(assigned_to=request.user).count(),
                 'followups_due': ParticipantFollowUp.objects.filter(
@@ -617,6 +711,10 @@ def dashboard(request):
                 'kpi_count': startup.kpis.count(),
                 'opportunity_count': startup.opportunities.count(),
             })
+    elif profile.is_innovator:
+        context.update({
+            'innovator_profiles': request.user.innovator_profiles.order_by('project_name'),
+        })
     elif profile.user_type == 'mentor' and hasattr(request.user, 'mentor_record'):
         mentor = request.user.mentor_record
         context.update({'mentor': mentor, 'my_sessions': mentor.engagements.select_related('startup').order_by('-date')[:10]})
@@ -867,14 +965,14 @@ def startup_profile(request, slug):
     authenticated = request.user.is_authenticated
     if request.method == 'GET':
         record_page_visit(request, 'startup', startup.slug, startup.name)
-    if not authenticated and (startup.status != 'active' or not startup.directory_visible):
+    if not startup.directory_visible or startup.status == 'inactive':
         raise Http404
     profile = get_profile(request.user) if authenticated else None
     more_login_url = f"{reverse('staff:user_login')}?{urlencode({'next': request.get_full_path()})}"
     is_inquiry_submission = request.method == 'POST' and request.POST.get('form_type') == 'startup_inquiry'
-    inquiry_form = StartupInquiryForm()
+    inquiry_form = StartupInquiryForm(startup=startup)
     if is_inquiry_submission:
-        inquiry_form = StartupInquiryForm(request.POST)
+        inquiry_form = StartupInquiryForm(request.POST, startup=startup)
         if inquiry_form.is_valid():
             inquiry = inquiry_form.save(commit=False)
             inquiry.startup = startup
@@ -887,8 +985,6 @@ def startup_profile(request, slug):
     # Only the owner of the startup (or a hub admin) may change it.
     can_edit = bool(profile and (profile.is_admin or request.user.is_staff or profile.startup_id == startup.id))
     can_view_private = can_edit
-    if startup.status == 'pending' and not can_edit:
-        return redirect(f"{reverse('staff:user_login')}?next={request.get_full_path()}")
     can_view_mentor_sessions = bool(profile and (profile.is_admin or profile.is_staff_role or profile.startup_id == startup.id))
 
     if request.method == 'POST' and not is_inquiry_submission:

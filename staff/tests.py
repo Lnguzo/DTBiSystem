@@ -1,9 +1,10 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from .forms import StartupInquiryForm
 from .models import Investor, Mentor, ParticipantJourney, Startup, UserProfile
 
 
@@ -853,7 +854,7 @@ class YcDirectoryPageTests(TestCase):
         self.client.force_login(self.staff_user)
         self.s1 = Startup.objects.create(name='Solar One', industry='Renewable Energy', status='active')
         self.s2 = Startup.objects.create(name='PayFlow Limited', industry='Fintech & E-commerce', status='active')
-        Startup.objects.create(name='Hidden Venture', industry='Fintech & E-commerce', status='inactive')
+        self.s3 = Startup.objects.create(name='Hidden Venture', industry='Fintech & E-commerce', status='inactive')
 
     def test_page_renders_yc_shell(self):
         response = self.client.get(reverse('staff:startups'))
@@ -970,11 +971,36 @@ class YcDirectoryPageTests(TestCase):
         self.assertContains(response, reverse('admin:staff_startup_changelist'))
 
     def test_grid_links_every_visible_startup(self):
-        response = self.client.get(reverse('staff:startups'))
+        response = self.client.get(reverse('staff:startups'), {'q': self.s1.name})
         self.assertContains(response, reverse('staff:startup_profile', kwargs={'slug': self.s1.slug}))
+        response = self.client.get(reverse('staff:startups'), {'q': self.s2.name})
         self.assertContains(response, reverse('staff:startup_profile', kwargs={'slug': self.s2.slug}))
         # Inactive startups stay hidden from non-admin visitors
-        self.assertNotContains(response, 'Hidden Venture')
+        response = self.client.get(reverse('staff:startups'), {'q': 'Hidden Venture'})
+        self.assertNotIn(self.s3, response.context['startup_list'].object_list)
+
+    def test_directory_includes_pending_catalogue_entries(self):
+        pending = Startup.objects.create(
+            name='Pending Catalogue Startup', industry='Education', status='pending',
+        )
+
+        response = self.client.get(reverse('staff:startups'), {'q': pending.name})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(pending, response.context['startup_list'].object_list)
+        self.assertContains(response, 'Pending Catalogue Startup')
+
+    def test_public_startup_counts_include_pending_directory_entries(self):
+        Startup.objects.create(name='Pending Count Startup', status='pending')
+        expected = Startup.objects.filter(
+            directory_visible=True, status__in=('active', 'pending'),
+        ).count()
+
+        response = self.client.get(reverse('landing'))
+
+        self.assertEqual(response.context['system_stats']['startups'], expected)
+        self.assertEqual(response.context['live_counts']['startups'], expected)
+        self.assertContains(response, 'Active and pending venture profiles')
 
     def test_empty_state_renders_without_spotlight(self):
         Startup.objects.all().delete()
@@ -982,3 +1008,18 @@ class YcDirectoryPageTests(TestCase):
         self.assertContains(response, 'No startups yet')
         self.assertContains(response, 'yc-empty')
         self.assertNotContains(response, 'id="ycRail"')
+
+
+class StartupInquiryFormTests(SimpleTestCase):
+    def test_message_placeholder_uses_the_current_startup_name(self):
+        first = StartupInquiryForm(startup=type("Startup", (), {"name": "SmartDarasa"})())
+        second = StartupInquiryForm(startup=type("Startup", (), {"name": "Shule Yetu"})())
+
+        self.assertEqual(
+            first.fields["message"].widget.attrs["placeholder"],
+            "Describe the opportunity, timing, and how SmartDarasa can follow up.",
+        )
+        self.assertEqual(
+            second.fields["message"].widget.attrs["placeholder"],
+            "Describe the opportunity, timing, and how Shule Yetu can follow up.",
+        )

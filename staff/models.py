@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 from django.utils import timezone
 from .storage import PrivateImportStorage
+from django.core.validators import FileExtensionValidator
 
 
 class Startup(models.Model):
@@ -372,6 +373,7 @@ class UserProfile(models.Model):
         ('staff', 'Staff'),
         ('mentor', 'Mentor'),
         ('investor', 'Investor'),
+        ('innovator', 'Innovator'),
         ('individual', 'Individual Startup'),
         ('public', 'Public Startup'),
     ]
@@ -413,6 +415,10 @@ class UserProfile(models.Model):
     @property
     def is_startup(self):
         return self.user_type in ['public', 'individual']
+
+    @property
+    def is_innovator(self):
+        return self.user_type == 'innovator'
 
     @property
     def startup_name(self):
@@ -891,3 +897,151 @@ class StartupInquiry(models.Model):
 
     def __str__(self):
         return f'{self.get_inquiry_type_display()} for {self.startup.name}: {self.subject}'
+
+
+class TalentPoolCohort(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('recruiting', 'Recruiting'),
+        ('active', 'In progress'),
+        ('completed', 'Completed'),
+    ]
+
+    title = models.CharField(max_length=180)
+    slug = models.SlugField(unique=True)
+    year = models.PositiveSmallIntegerField()
+    summary = models.CharField(max_length=320)
+    description = models.TextField()
+    duration_weeks = models.PositiveSmallIntegerField(default=8)
+    participant_count = models.PositiveSmallIntegerField(null=True, blank=True)
+    award_winning_teams = models.PositiveSmallIntegerField(null=True, blank=True)
+    partners = models.TextField(blank=True, help_text='List partner organizations, one per line.')
+    focus_areas = models.TextField(blank=True, help_text='List programme focus areas, one per line.')
+    programme_structure = models.TextField(blank=True)
+    outcomes = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='draft')
+    article_url = models.URLField(blank=True)
+    hero_image = models.ImageField(upload_to='talent-pool/cohorts/', blank=True)
+    hero_image_path = models.CharField(max_length=255, blank=True, help_text='Optional path relative to static/.')
+    is_featured = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=False)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-year', 'sort_order', 'title']
+        verbose_name = 'Talent Pool cohort'
+        verbose_name_plural = 'Talent Pool cohorts'
+
+    def __str__(self):
+        return self.title
+
+
+class TalentPoolEvent(models.Model):
+    EVENT_TYPES = [
+        ('programme', 'Programme overview'),
+        ('workshop', 'Workshop or session'),
+        ('demo_day', 'Demo Day'),
+        ('other', 'Other event'),
+    ]
+
+    cohort = models.ForeignKey(TalentPoolCohort, on_delete=models.CASCADE, related_name='events')
+    title = models.CharField(max_length=180)
+    event_type = models.CharField(max_length=16, choices=EVENT_TYPES, default='other')
+    event_date = models.DateField(null=True, blank=True)
+    location = models.CharField(max_length=180, blank=True)
+    description = models.TextField(blank=True)
+    guest_of_honour = models.CharField(max_length=180, blank=True)
+    video_file = models.FileField(
+        upload_to='talent-pool/videos/%Y/', blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=['mp4', 'webm', 'mov', 'm4v'])],
+    )
+    video_url = models.URLField(blank=True, help_text='Optional YouTube link if a video file is not available.')
+    is_published = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['event_date', 'sort_order', 'pk']
+
+    def __str__(self):
+        return f'{self.title} — {self.cohort.title}'
+
+    @property
+    def video_embed_url(self):
+        if not self.video_url:
+            return ''
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(self.video_url)
+        host = parsed.netloc.lower().split(':')[0]
+        video_id = ''
+        if host in {'youtu.be', 'www.youtu.be'}:
+            video_id = parsed.path.strip('/').split('/')[0]
+        elif host.endswith('youtube.com'):
+            parts = [part for part in parsed.path.split('/') if part]
+            if len(parts) >= 2 and parts[0] in {'shorts', 'embed', 'live'}:
+                video_id = parts[1]
+            elif parsed.path == '/watch':
+                video_id = parse_qs(parsed.query).get('v', [''])[0]
+        if video_id and all(char.isalnum() or char in '-_' for char in video_id):
+            return f'https://www.youtube-nocookie.com/embed/{video_id}'
+        return ''
+
+
+class TalentPoolPhoto(models.Model):
+    event = models.ForeignKey(TalentPoolEvent, on_delete=models.CASCADE, related_name='photos')
+    image = models.ImageField(upload_to='talent-pool/events/', blank=True)
+    image_path = models.CharField(max_length=255, blank=True, help_text='Optional path relative to static/.')
+    caption = models.CharField(max_length=255, blank=True)
+    alt_text = models.CharField(max_length=255)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'pk']
+        verbose_name = 'Talent Pool event photo'
+        verbose_name_plural = 'Talent Pool event photos'
+
+    def __str__(self):
+        return self.caption or f'Photo {self.pk} — {self.event.title}'
+
+
+class InnovatorProfile(models.Model):
+    """Public profile for an innovator and their featured agricultural project."""
+
+    CATALOGUE_CHOICES = [
+        ('agritech', 'AgriTech and Food Systems Innovations'),
+        ('makisatu', 'MAKISATU Innovation Catalogue'),
+    ]
+
+    innovator_name = models.CharField(max_length=180)
+    project_name = models.CharField(max_length=220)
+    slug = models.SlugField(unique=True)
+    catalogue = models.CharField(max_length=16, choices=CATALOGUE_CHOICES)
+    description = models.TextField()
+    contact_email = models.EmailField(blank=True)
+    phone_number = models.CharField(max_length=50, blank=True, help_text='Confidential. Visible only to the linked innovator and DTBi staff/admin.')
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='innovator_profiles', help_text='Innovator login account. Multiple project profiles can share one innovator account.',
+    )
+    website = models.URLField(blank=True, help_text='Innovator or project website, when available.')
+    source_url = models.URLField(blank=True, help_text='Public article or institutional source used to expand the profile.')
+    entry_period = models.CharField(max_length=100, blank=True)
+    milestones_text = models.TextField(blank=True, help_text='Private programme milestones and statuses, one per line.')
+    programme_remarks = models.TextField(blank=True)
+    staff_recommendation = models.TextField(blank=True)
+    image = models.ImageField(upload_to='innovators/', blank=True)
+    image_path = models.CharField(max_length=255, blank=True, help_text='Optional path relative to static/.')
+    is_published = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['catalogue', 'sort_order', 'project_name']
+        verbose_name = 'Innovator profile'
+        verbose_name_plural = 'Innovator profiles'
+
+    def __str__(self):
+        return f'{self.project_name} — {self.innovator_name}'

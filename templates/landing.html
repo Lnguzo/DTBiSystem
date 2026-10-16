@@ -17,6 +17,7 @@
                 <img src="{% static 'img/brands/staff1.jpeg' %}" alt="">
                 <img src="{% static 'img/brands/staff2.jpeg' %}" alt="">
                 <img src="{% static 'img/brands/staff3.jpeg' %}" alt="">
+                <img src="{% static 'img/brands/dtbi-overview.jpg' %}" alt="">
             </div>
             <div class="hero-grid" aria-hidden="true"></div>
             <canvas class="ambient-field ambient-field-hero" aria-hidden="true"></canvas>
@@ -64,7 +65,7 @@
     <section class="overview-stats-grid" data-stagger="110" aria-label="System statistics">
         <article class="overview-stat-card">
             <span class="overview-stat-icon"><i class="fas fa-rocket"></i></span>
-            <div><span class="overview-stat-label">Startups</span><strong>{{ system_stats.startups }}</strong><small>Published venture profiles</small></div>
+            <div><span class="overview-stat-label">Startups</span><strong>{{ system_stats.startups }}</strong><small>Active and pending venture profiles</small></div>
         </article>
         <article class="overview-stat-card">
             <span class="overview-stat-icon"><i class="fas fa-users"></i></span>
@@ -100,9 +101,36 @@
     </section>
     {% endif %}
 
-    <section class="overview-section-head" id="upcoming-opportunities" data-reveal>
-        <div><span class="overview-kicker">What is happening</span><h2>Upcoming opportunities</h2><p>Open opportunities published by startups in the system.</p></div>
-        <a class="overview-clear-search" href="{% url 'staff:startups' %}">Explore startups</a>
+    <section class="overview-section-head programmes-heading" data-reveal>
+        <div><span class="overview-kicker">Explore the ecosystem</span><h2>Programmes and community</h2><p>Find the programme, people, and ventures that match the stage you are interested in.</p></div>
+    </section>
+    <section class="programme-cards" data-stagger="100" aria-label="Programmes and community">
+        <a href="{% url 'talent_pool' %}" class="programme-card programme-card-featured">
+            <span class="programme-card-icon"><i class="fas fa-people-group" aria-hidden="true"></i></span>
+            <span class="programme-card-kicker">Practical learning and mentorship</span>
+            <h3>Talent Pool{% if featured_talent_pool %} {{ featured_talent_pool.year }}{% endif %}</h3>
+            <p>{% if featured_talent_pool %}{{ featured_talent_pool.summary }}{% else %}Explore BUNI and DTBi Talent Pool cohorts, programme details, and event stories.{% endif %}</p>
+            <span class="programme-card-link">Explore Talent Pool <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+        <a href="{% url 'innovators' %}" class="programme-card">
+            <span class="programme-card-icon"><i class="fas fa-lightbulb" aria-hidden="true"></i></span>
+            <span class="programme-card-kicker">Ideas and projects</span>
+            <h3>Innovators</h3>
+            <p>Browse agricultural and food-system ideas, meet the innovators behind them, and find contact links for follow-up.</p>
+            <span class="programme-card-link">Explore Innovators <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+        <a href="{% url 'staff:startups' %}" class="programme-card">
+            <span class="programme-card-icon"><i class="fas fa-rocket" aria-hidden="true"></i></span>
+            <span class="programme-card-kicker">Ventures and companies</span>
+            <h3>Startups</h3>
+            <p>Browse startup profiles, their products, industries, and opportunities to work together.</p>
+            <span class="programme-card-link">Browse Startups <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+    </section>
+
+    <section class="overview-section-head upcoming-heading" id="upcoming-opportunities" data-reveal>
+        <div><span class="overview-kicker">Open calls and events</span><h2>Upcoming opportunities</h2><p>Current opportunities published by startups in the system.</p></div>
+        <a class="overview-clear-search" href="{% url 'staff:startups' %}">Browse startups</a>
     </section>
     <section class="overview-capability-grid" data-stagger="100" aria-label="Upcoming opportunities">
         {% for opportunity in upcoming_opportunities %}

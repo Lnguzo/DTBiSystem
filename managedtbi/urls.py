@@ -4,6 +4,8 @@ from django.urls import path, include
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.auth import views as auth_views
+from django.conf import settings
+from django.conf.urls.static import static
 from staff.views import user_login, user_logout, dashboard, index, landing
 from staff import views as staff_views
 from staff import data_views as staff_data_views
@@ -12,6 +14,10 @@ from staff.public_reports import public_report_csv, public_report_pdf
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', landing, name='landing'),
+    path('talent-pool/', staff_views.talent_pool, name='talent_pool'),
+    path('innovators/', staff_views.innovators_preview, name='innovators'),
+    path('innovators/export/<str:file_format>/', staff_views.innovators_export, name='innovators_export'),
+    path('innovators/<slug:slug>/', staff_views.innovator_profile, name='innovator_profile'),
     path('impact/', staff_views.impact_explorer, name='impact_explorer'),
     path('hub-history/', staff_views.hub_history, name='hub_history'),
     path('mentors/', staff_views.mentors, name='mentors'),
@@ -39,3 +45,6 @@ urlpatterns = [
         template_name='registration/password_reset_complete.html'
     ), name='password_reset_complete'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ innovator.project_name }} | Innovators{% endblock %}
+{% block page_title %}Innovator profile{% endblock %}
+
+{% block content %}
+<main class="innovators-page innovator-detail-page">
+    <a class="innovator-back" href="{% url 'innovators' %}"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to all innovators</a>
+    <article class="innovator-detail">
+        <div class="innovator-detail-heading">
+            <div class="innovator-detail-art">
+                {% if innovator.image %}<img src="{{ innovator.image.url }}" alt="{{ innovator.project_name }}">
+                {% elif innovator.image_path %}<img src="{% static innovator.image_path %}" alt="{{ innovator.project_name }}">
+                {% else %}<i class="fas fa-seedling" aria-hidden="true"></i>{% endif %}
+            </div>
+            <div><span class="innovator-tag">{{ innovator.get_catalogue_display }}</span><h1>{{ innovator.project_name }}</h1><p class="innovator-byline">Innovation by <strong>{{ innovator.innovator_name }}</strong></p></div>
+        </div>
+        <section class="innovator-detail-section"><span class="talent-section-kicker">About the innovation</span><p>{{ innovator.description|linebreaksbr }}</p></section>
+        <section class="innovator-contact-panel"><div><span class="talent-section-kicker">Connect with the innovator</span><h2>Learn more or discuss collaboration</h2><p>Contact details are shown as provided in the source catalogue.</p></div>
+            <div class="innovator-contact-actions">
+                {% if innovator.contact_email %}<a class="talent-button" href="mailto:{{ innovator.contact_email }}?subject={{ innovator.project_name|urlencode }}">Email {{ innovator.innovator_name }}</a>{% endif %}
+                {% if innovator.website %}<a class="innovator-source-link" href="{{ innovator.website }}" target="_blank" rel="noopener noreferrer">Visit website <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>{% endif %}
+                {% if innovator.source_url and innovator.source_url != innovator.website %}<a class="innovator-source-link" href="{{ innovator.source_url }}" target="_blank" rel="noopener noreferrer">Read supporting source <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>{% endif %}
+            </div>
+        </section>
+    </article>
+</main>
+{% endblock %}

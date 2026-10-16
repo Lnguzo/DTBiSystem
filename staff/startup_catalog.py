@@ -1,7 +1,7 @@
-"""Organization profiles transcribed from modified.xlsx for the public directory."""
+"""Organization profiles from the DTBi startup catalog, updated with startup.docx, for the public directory."""
 
 STARTUP_CATALOG = [
-    ("Manufacturers", "Nyirenda’s Company", "Pre-paid water meter."),
+    ("Manufacturers", "Nyirenda's Company", "Pre-paid water meter."),
     ("Manufacturers", "Guavay Company Limited", "Organic fertilizer and pharmaceutical solutions."),
     ("Manufacturers", "Bee Venom Sensor", "Sensor device for collecting bee venom."),
     ("Manufacturers", "Neema Makundi", "Cashew nut almonds marketed through ICT in local and external markets."),
@@ -40,6 +40,8 @@ STARTUP_CATALOG = [
     ("Cyber Security", "SasaTech", "Software development and security auditing system."),
     ("Cyber Security", "Equipoint", "Fleet and fuel monitoring solution."),
     ("Cyber Security", "Aim Firms", "Online data backup and recovery solution."),
+    ("Fintech / E-commerce", "iGlobal Learning Agency", "Fintech and education technology solution."),
+    ("Manufacturers", "Touchtop Computers", "Asset management system that automates organizational asset quantity and value records."),
 ]
 
 # Year values supplied by the programme. These are cohort years, not inferred

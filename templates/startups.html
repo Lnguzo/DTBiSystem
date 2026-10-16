@@ -145,7 +145,7 @@
                         {% if s.description %}<p class="yc-card-desc">{{ s.description|truncatewords:18 }}</p>{% endif %}
                         <div class="yc-card-foot">
                             <span class="yc-card-ind">{{ s.industry|default:"Venture" }}</span>
-                            <a class="yc-card-cta" href="{% url 'staff:startup_profile' slug=s.slug %}" aria-label="View profile for {{ s.name }}">View profile <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                            <a class="yc-card-cta" href="{% url 'staff:startup_profile' slug=s.slug %}" aria-label="View profile for {{ s.name }}">View profile</a>
                         </div>
                     </div>
                 </article>

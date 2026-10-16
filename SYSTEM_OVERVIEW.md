@@ -20,10 +20,14 @@ The implemented system covers:
 - Staff Data Hub for bulk imports, page-visit statistics, partnership management, and programme reports
 - User accounts and profiles, startup ownership, role-aware staff/admin workflows, login tracking, and saved display preferences
 - Administrative access through Django Admin
+- Public Talent Pool cohort and event pages with programme descriptions, event photos, and video links/files; staff manage cohorts and events through Django Admin
+- Public Innovator directory and profiles, with linked Innovator accounts and staff/admin management of private contact and programme records
 
-The public landing page presents BUNI and DTBi together and shows database-backed counts for published startups, active mentors and investors, and committed or received funding records. The funding tile counts records rather than summing amounts across currencies. Its hero copy contains a full-bleed slideshow that cycles through the four local staff images every 2.5 seconds. Each image covers the hero background with an individually tuned focal position and a subtle dark overlay; centered white text and actions sit directly over the photos without a backing card. The shared page-content background has a slow, low-contrast gradient animation. The slideshow and background animation respect reduced-motion preferences.
+The public landing page presents BUNI and DTBi together and shows database-backed counts for active and pending directory-visible startups, active mentors and investors, and committed or received funding records. The funding tile counts records rather than summing amounts across currencies. Its hero copy contains a full-bleed slideshow that cycles through five local staff and ecosystem images every 2.5 seconds. Each image covers the hero background with an individually tuned focal position and a subtle dark overlay; centered white text and actions sit directly over the photos without a backing card. The shared page-content background has a slow, low-contrast gradient animation. The slideshow and background animation respect reduced-motion preferences.
 
-The startup directory presents organization profiles grouped under ten categories from `modified.xlsx`, using organization names and descriptions. A category dropdown filters the single startup list, which shows six organizations per page. The ecosystem map page has been removed. The directory includes a year and organization selector for annual statistics and filtered CSV downloads. Previously published directory listings are hidden while linked operational records remain intact. The public Impact Explorer (`/impact/`) filters recorded startup cohorts, participant starts, completed mentor sessions, milestone updates, and latest annual job snapshots by year and optionally by startup. Its employment chart is built from the same annual rows and it does not fill gaps with invented data. The public BUNI & DTBi History page (`/hub-history/`) presents programme history and clearly attributed 2011–2020 estimates from the COSTECH Graduate Tracer Study and Impact Assessment. Historical study figures are distinct from current system totals. Programme examples from the study are labeled as archived examples, not current application calls.
+The startup directory presents directory-visible active organization profiles using their recorded names and descriptions; inactive or hidden listings are unavailable in the public directory. New startup applications may remain pending while staff review them. Private contact and programme fields remain restricted to the startup owner and DTBi staff. Startup cards link to profiles without a trailing arrow icon. The directory paginates 12 startups per page. It includes a year and organization selector for annual statistics and filtered CSV downloads. The public Impact Explorer (`/impact/`) filters recorded startup cohorts, participant starts, completed mentor sessions, milestone updates, and latest annual job snapshots by year and optionally by startup. Its employment chart is built from the same annual rows and it does not fill gaps with invented data. The public BUNI & DTBi History page (`/hub-history/`) presents programme history and clearly attributed 2011–2020 estimates from the COSTECH Graduate Tracer Study and Impact Assessment. Historical study figures are distinct from current system totals. Programme examples from the study are labeled as archived examples, not current application calls.
+
+The October 2026 public-source review updated and activated 14 imported startup profiles with recent operational evidence, adding a source-backed “More details” section to each reviewed profile. At the administrator's direction, the remaining 15 legacy catalogue records were changed from pending to inactive and hidden from the public directory; this records their current directory disposition and does not assert confirmed closure. The `0037_mark_legacy_startups_inactive` migration only changes the named legacy records when they are still pending. New startup applications continue to use pending status for staff review.
 
 Mentors and investors are database-backed. Their public directories support search, filtering, and pagination, and recorded profile pages are publicly readable. The current demonstration roster contains five fictional profiles of each type, clearly labeled as examples. Owner and staff views keep contact details, mentoring activity, and investor-linked financial records restricted. Staff manage source records through Django Admin. Participant, support-delivery, follow-up, and detailed outcome records remain in staff/admin workflows; the public impact explorer exposes aggregate totals only.
 
@@ -96,6 +100,18 @@ DTBiSystem/
 
 The Data Hub implementation is split across `staff/data_views.py` (access-controlled HTTP workflows), `staff/data_services.py` (import validation and reporting aggregation), and `staff/report_ai.py` (optional executive summaries). Participant workflow forms are in `staff/forms.py`; persisted data and audit history are in `staff/models.py`.
 
+Talent Pool pages are available at `/talent-pool/`. Published cohorts contain programme summaries, structure and outcomes; published events can include descriptions, photo galleries, and uploaded videos or video links. The 2026 participant learning-session photo appears within the main event gallery. The page does not render the separate bottom programme infographic. Staff manage cohorts and events in Django Admin. Talent Pool event uploads use extension validation for common video formats.
+
+Innovators are listed publicly at `/innovators/`, with published profiles at `/innovators/<slug>/`. The directory shows 12 projects per page and keeps search/catalogue filters when navigating pages. Public pages contain project information and public web/email links, but do not render Innovator phone numbers or internal programme milestones, remarks, or recommendations. The directory links visitors to Talent Pool and startup pages for related exploration. Innovators sign in to `/staff/login/` and use `/staff/account/` to see private fields only on records linked to their account. Staff and admins can open **Innovator records** from the authenticated sidebar or their dashboard and manage all records; Django Admin is also available. New Innovator accounts created by the workbook import use the initial password `123`; accounts should change it after first login.
+
+The MAKISATU Innovator workbook can be imported with:
+
+```text
+python manage.py import_makisatu_innovators --file <workbook.xlsx>
+```
+
+The import is repeatable and links multiple project records to the same Innovator account when the person matches. Phone numbers and programme notes are stored as private Innovator fields and are not included in public profiles or general Data Hub exports.
+
 ## 5. Django Configuration
 
 The project configuration is in `managedtbi/settings.py`.
@@ -112,13 +128,13 @@ The project configuration is in `managedtbi/settings.py`.
 
 ### Database
 
-The development database uses SQLite:
+The development database uses SQLite. `DTBI_DATABASE_NAME` can set an explicit database path. Otherwise, an existing ignored `db.local.sqlite3` is used for local work; clean checkouts without that file use the tracked `db.sqlite3` baseline.
 
 ```python
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": BASE_DIR / "db.local.sqlite3",  # or db.sqlite3 on a clean checkout
     }
 }
 ```
@@ -132,7 +148,7 @@ DATABASES = {
 - Media directory: `media/`
 - Media URL: `/media/`
 
-The development settings define media storage, but the root URL configuration does not currently add a development media-serving route.
+The root URL configuration serves media files in development when `DEBUG` is enabled. Production media serving must be configured separately.
 
 ### Authentication settings
 
@@ -228,7 +244,7 @@ Stores products or services provided by a startup.
 Extends Django's built-in `User` model.
 
 - One-to-one relationship with `User`.
-- User types: admin, staff, public startup, and individual startup.
+- User types: admin, staff, Innovator, public startup, and individual startup.
 - May link a user to one startup.
 - Stores company information, biography, avatar, phone, website, registration date, last login IP, login count, and email-verification fields.
 - Stores light/dark/system theme preference and an email-notification preference (email delivery is not currently wired to platform events).
@@ -239,6 +255,23 @@ Staff/admin accounts are created by an administrator, not through public registr
 ### Mentor and Investor
 
 These records store the BUNI-derived people and investment contacts used by the system. They are registered in Django Admin for administrator-controlled add, edit, and delete operations. The overview counts only active records and never uses hard-coded totals.
+
+### Talent Pool Cohort, Event, and Photo
+
+- A cohort stores the programme title, year, duration, summary, structure, partners, focus areas, outcomes, publication state, and optional hero image.
+- Events belong to a cohort and store title, type, date, location, description, guest of honour, and an optional uploaded video or external video URL.
+- Photos belong to events and store an uploaded image or static image path, caption, alternative text, and display order.
+- Only published cohorts and published events appear on the public Talent Pool page. Staff/admin maintain content through Django Admin.
+- Event galleries start as a compact overlapping photo stack. Visitors can expand or collapse the stack; expansion reveals the original responsive photo grid with its captions and links, and honors reduced-motion preferences.
+
+### InnovatorProfile
+
+- Stores the Innovator's name, project name, catalogue, description, public website/source links, image, and publication state.
+- Each profile may link to an Innovator login account; one Innovator account can own multiple project profiles.
+- Phone number, entry period, programme milestones, remarks, and staff recommendations are private fields. Public directory and profile templates do not display them.
+- An Innovator account sees only linked profiles on `/staff/account/`. Staff/admin can view and edit all profiles from the dashboard sidebar or Django Admin.
+- The general Data Hub import/export choices do not include Innovator profiles.
+- The public Innovator directory can export its published, currently filtered profiles as a PDF summary or formatted Excel workbook. Exports follow the same search/catalogue filters as the page and omit confidential phone numbers and internal programme notes.
 
 ### MentorEngagement
 
@@ -310,6 +343,12 @@ Root routes are defined in `managedtbi/urls.py`; staff routes are defined in `st
 | `/staff/register/` | Public | New account registration |
 | `/staff/settings/` | Authenticated | Update account details, theme preference, and notification preference |
 | `/staff/` | Authenticated | Main authenticated index/dashboard page |
+| `/staff/account/` | Authenticated | Account-specific dashboard; Innovators see only records linked to their login |
+| `/staff/innovators/manage/` | Staff/Admin | Search and review all Innovator profiles and confidential programme/contact fields |
+| `/staff/innovators/manage/<id>/` | Staff/Admin | Edit Innovator public profile and private programme/contact fields |
+| `/talent-pool/` | Public | Browse published Talent Pool cohorts, event details, photos, and videos |
+| `/innovators/` | Public | Browse published Innovator projects without private phone or programme fields |
+| `/innovators/<slug>/` | Public | View one published Innovator project profile |
 | `/staff/startups/` | Public | Searchable, filterable, paginated startup directory |
 | `/staff/startups/create/` | Authenticated | Create a startup and its related records |
 | `/staff/startups/<slug>/` | Authenticated | View and, when authorized, edit a startup profile |
@@ -476,7 +515,7 @@ Frontend assets:
 - `static/style/style.css`: application styling, including a subtle animated gradient behind shared page content (decorative and non-interactive) and a full-bleed staff-photo hero slideshow with centered white text over a subtle dark overlay and no backing card.
 - `static/js/script.js`: shared browser interactions and sidebar behavior.
 - `static/js/ambient.js`: low-contrast binary rain in the sidebar and overview hero; it is local, pauses when the tab is hidden, and is disabled for reduced-motion preferences.
-- `static/img/brands/staff.jpeg` and `staff1.jpeg`–`staff3.jpeg`: local images used by the overview hero slideshow.
+- `static/img/brands/staff.jpeg`, `staff1.jpeg`–`staff3.jpeg`, and `dtbi-overview.jpg`: local images used by the overview hero slideshow.
 - `static/img/brands/fursahub.png`: Fursa Hub logo shown in the shared top bar.
 - `partials/pagination.html`: shared server-side pagination controls that retain the current search/filter criteria.
 - `static/img/dtbi-logo.svg`: available logo asset.

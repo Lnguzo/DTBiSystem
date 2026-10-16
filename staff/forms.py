@@ -9,6 +9,7 @@ from .models import (
     MentorEngagement, ParticipantJourney, ParticipantSupport, ParticipantFollowUp,
     ParticipantOutcome,
     StartupInquiry,
+    InnovatorProfile,
 )
 
 
@@ -34,6 +35,32 @@ class ProfilePreferencesForm(forms.ModelForm):
             'company_website': forms.URLInput(attrs={'class': 'form-input'}),
             'theme': forms.Select(attrs={'class': 'form-select'}),
             'email_notifications': forms.CheckboxInput(attrs={'class': 'settings-checkbox'}),
+        }
+
+
+class InnovatorManagementForm(forms.ModelForm):
+    class Meta:
+        model = InnovatorProfile
+        fields = [
+            'innovator_name', 'project_name', 'catalogue', 'description',
+            'contact_email', 'phone_number', 'entry_period', 'milestones_text',
+            'programme_remarks', 'staff_recommendation', 'website', 'source_url',
+            'is_published',
+        ]
+        widgets = {
+            'innovator_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'project_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'catalogue': forms.Select(attrs={'class': 'form-select'}),
+            'description': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 4}),
+            'contact_email': forms.EmailInput(attrs={'class': 'form-input'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-input', 'autocomplete': 'off'}),
+            'entry_period': forms.TextInput(attrs={'class': 'form-input'}),
+            'milestones_text': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 8}),
+            'programme_remarks': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'staff_recommendation': forms.Textarea(attrs={'class': 'form-textarea', 'rows': 3}),
+            'website': forms.URLInput(attrs={'class': 'form-input'}),
+            'source_url': forms.URLInput(attrs={'class': 'form-input'}),
+            'is_published': forms.CheckboxInput(attrs={'class': 'settings-checkbox'}),
         }
 
 
@@ -150,9 +177,16 @@ class StartupInquiryForm(forms.ModelForm):
         max_length=5000,
         widget=forms.Textarea(attrs={
             'class': 'form-textarea', 'rows': 4,
-            'placeholder': 'Describe the opportunity, timing, and how SmartDarasa can follow up.',
+            'placeholder': 'Describe the opportunity, timing, and preferred follow-up details.',
         }),
     )
+
+    def __init__(self, *args, startup=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if startup is not None:
+            self.fields['message'].widget.attrs['placeholder'] = (
+                f"Describe the opportunity, timing, and how {startup.name} can follow up."
+            )
 
     class Meta:
         model = StartupInquiry
