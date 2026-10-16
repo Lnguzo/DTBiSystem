@@ -22,10 +22,19 @@
         {% if innovator_query or selected_catalogue %}<a class="innovator-reset" href="{% url 'innovators' %}">Clear</a>{% endif %}
     </form>
 
+    <section class="innovators-export-panel" data-reveal aria-label="Download innovator directory summary">
+        <div class="innovators-export-mark" aria-hidden="true"><i class="fas fa-file-arrow-down"></i></div>
+        <div class="innovators-export-copy"><span class="talent-section-kicker">Take the catalogue with you</span><strong>Download innovator summary</strong><small>Includes published projects and current filters. Confidential phone numbers and staff notes are excluded.</small></div>
+        <div class="innovators-export-actions">
+            <a class="innovators-export-button innovators-export-xlsx" href="{% url 'innovators_export' file_format='xlsx' %}{% if export_query %}?{{ export_query }}{% endif %}"><i class="fas fa-file-excel" aria-hidden="true"></i><span>Excel</span></a>
+            <a class="innovators-export-button innovators-export-pdf" href="{% url 'innovators_export' file_format='pdf' %}{% if export_query %}?{{ export_query }}{% endif %}"><i class="fas fa-file-pdf" aria-hidden="true"></i><span>PDF</span></a>
+        </div>
+    </section>
+
     {% if innovator_profiles %}
-    <section class="innovator-grid" aria-label="Innovator profiles">
+    <section class="innovator-grid" data-stagger="65" aria-label="Innovator profiles">
         {% for innovator in innovator_profiles %}
-        <article class="innovator-card">
+        <article class="innovator-card" style="--innovator-order:{{ forloop.counter0 }}">
             <a class="innovator-card-main" href="{% url 'innovator_profile' slug=innovator.slug %}">
                 <div class="innovator-card-art">
                     {% if innovator.image %}<img src="{{ innovator.image.url }}" alt="{{ innovator.project_name }}">

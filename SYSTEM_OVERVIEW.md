@@ -269,6 +269,7 @@ These records store the BUNI-derived people and investment contacts used by the 
 - Phone number, entry period, programme milestones, remarks, and staff recommendations are private fields. Public directory and profile templates do not display them.
 - An Innovator account sees only linked profiles on `/staff/account/`. Staff/admin can view and edit all profiles from the dashboard sidebar or Django Admin.
 - The general Data Hub import/export choices do not include Innovator profiles.
+- The public Innovator directory can export its published, currently filtered profiles as a PDF summary or formatted Excel workbook. Exports follow the same search/catalogue filters as the page and omit confidential phone numbers and internal programme notes.
 
 ### MentorEngagement
 

@@ -16,6 +16,7 @@ urlpatterns = [
     path('', landing, name='landing'),
     path('talent-pool/', staff_views.talent_pool, name='talent_pool'),
     path('innovators/', staff_views.innovators_preview, name='innovators'),
+    path('innovators/export/<str:file_format>/', staff_views.innovators_export, name='innovators_export'),
     path('innovators/<slug:slug>/', staff_views.innovator_profile, name='innovator_profile'),
     path('impact/', staff_views.impact_explorer, name='impact_explorer'),
     path('hub-history/', staff_views.hub_history, name='hub_history'),

@@ -32,6 +32,7 @@ from .forms import (
     InnovatorManagementForm,
 )
 from .data_views import record_page_visit
+from .innovator_reports import public_innovator_queryset, innovators_export
 from .startup_filters import (
     STARTUP_INDUSTRY_CATEGORIES,
     apply_startup_directory_filters,
@@ -299,15 +300,7 @@ def innovators_preview(request):
     """Public directory of innovators and their agriculture and food-system projects."""
     query = request.GET.get('q', '').strip()
     catalogue = request.GET.get('catalogue', '').strip()
-    profiles = InnovatorProfile.objects.filter(is_published=True)
-    if catalogue in {'agritech', 'makisatu'}:
-        profiles = profiles.filter(catalogue=catalogue)
-    if query:
-        profiles = profiles.filter(
-            Q(innovator_name__icontains=query)
-            | Q(project_name__icontains=query)
-            | Q(description__icontains=query)
-        )
+    profiles = public_innovator_queryset(request.GET)
     page_obj = Paginator(profiles, 12).get_page(request.GET.get('page'))
     page_query = urlencode({
         key: value for key, value in {'q': query, 'catalogue': catalogue}.items() if value
@@ -319,6 +312,9 @@ def innovators_preview(request):
         'selected_catalogue': catalogue,
         'page_obj': page_obj,
         'page_query': page_query,
+        'export_query': urlencode({
+            key: value for key, value in {'q': query, 'catalogue': catalogue}.items() if value
+        }),
     })
 
 
