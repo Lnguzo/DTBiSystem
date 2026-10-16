@@ -81,8 +81,7 @@
                     {% elif photo.image_path %}<img style="--stack-order:{{ forloop.counter0 }}" src="{% static photo.image_path %}" alt="">{% endif %}
                     {% endif %}{% endfor %}
                 </span>
-                <span class="talent-gallery-cluster-copy"><span class="talent-section-kicker">A collection of moments</span><strong>Explore the programme photos</strong><small>{{ event.photos.all|length }} photos with captions</small></span>
-                <span class="talent-gallery-cluster-action"><i class="fas fa-images" aria-hidden="true"></i><span data-gallery-action>Open gallery</span><i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+                <span class="talent-gallery-cluster-copy"><span class="talent-section-kicker">A collection of moments</span><strong>Explore the programme photos</strong><small data-gallery-hint>Tap here to view {{ event.photos.all|length }} photos</small></span>
             </button>
             <noscript><style>.talent-gallery-cluster{display:none!important}.talent-gallery[hidden]{display:grid!important}</style></noscript>
         <div class="talent-gallery" id="talent-gallery-{{ event.pk }}" hidden>
@@ -120,7 +119,7 @@
     document.querySelectorAll('.talent-gallery-stage').forEach(function (stage) {
         var button = stage.querySelector('.talent-gallery-cluster');
         var gallery = stage.querySelector('.talent-gallery');
-        var action = stage.querySelector('[data-gallery-action]');
+        var hint = stage.querySelector('[data-gallery-hint]');
         var closeTimer;
         if (!button || !gallery) return;
 
@@ -129,7 +128,7 @@
             window.clearTimeout(closeTimer);
             if (isOpen) {
                 button.setAttribute('aria-expanded', 'false');
-                if (action) action.textContent = 'Open gallery';
+                if (hint) hint.textContent = 'Tap here to view the photos';
                 gallery.classList.remove('is-expanding');
                 gallery.classList.add('is-collapsing');
                 closeTimer = window.setTimeout(function () {
@@ -142,7 +141,7 @@
             gallery.hidden = false;
             gallery.classList.remove('is-collapsing');
             button.setAttribute('aria-expanded', 'true');
-            if (action) action.textContent = 'Close gallery';
+            if (hint) hint.textContent = 'Tap here again to close the gallery';
             window.requestAnimationFrame(function () {
                 gallery.classList.add('is-expanding');
                 window.setTimeout(function () { gallery.classList.remove('is-expanding'); }, 850);
