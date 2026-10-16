@@ -965,7 +965,7 @@ def startup_profile(request, slug):
     authenticated = request.user.is_authenticated
     if request.method == 'GET':
         record_page_visit(request, 'startup', startup.slug, startup.name)
-    if not authenticated and (startup.status != 'active' or not startup.directory_visible):
+    if not startup.directory_visible or startup.status == 'inactive':
         raise Http404
     profile = get_profile(request.user) if authenticated else None
     more_login_url = f"{reverse('staff:user_login')}?{urlencode({'next': request.get_full_path()})}"
@@ -985,8 +985,6 @@ def startup_profile(request, slug):
     # Only the owner of the startup (or a hub admin) may change it.
     can_edit = bool(profile and (profile.is_admin or request.user.is_staff or profile.startup_id == startup.id))
     can_view_private = can_edit
-    if startup.status == 'pending' and not can_edit:
-        return redirect(f"{reverse('staff:user_login')}?next={request.get_full_path()}")
     can_view_mentor_sessions = bool(profile and (profile.is_admin or profile.is_staff_role or profile.startup_id == startup.id))
 
     if request.method == 'POST' and not is_inquiry_submission:
