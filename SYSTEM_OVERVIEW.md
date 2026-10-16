@@ -260,6 +260,7 @@ These records store the BUNI-derived people and investment contacts used by the 
 - Events belong to a cohort and store title, type, date, location, description, guest of honour, and an optional uploaded video or external video URL.
 - Photos belong to events and store an uploaded image or static image path, caption, alternative text, and display order.
 - Only published cohorts and published events appear on the public Talent Pool page. Staff/admin maintain content through Django Admin.
+- Event galleries start as a compact overlapping photo stack. Visitors can expand or collapse the stack; expansion reveals the original responsive photo grid with its captions and links, and honors reduced-motion preferences.
 
 ### InnovatorProfile
 

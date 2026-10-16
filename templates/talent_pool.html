@@ -73,11 +73,24 @@
 
         {% if event.photos.all %}
         <div class="talent-gallery-heading"><div><span class="talent-section-kicker">The programme in pictures</span><h2>Eight weeks, shared together</h2></div><span>{{ event.photos.all|length }} photos</span></div>
-        <div class="talent-gallery">
+        <div class="talent-gallery-stage">
+            <button class="talent-gallery-cluster" type="button" aria-expanded="false" aria-controls="talent-gallery-{{ event.pk }}">
+                <span class="talent-photo-stack" aria-hidden="true">
+                    {% for photo in event.photos.all %}{% if forloop.counter <= 5 %}
+                    {% if photo.image %}<img style="--stack-order:{{ forloop.counter0 }}" src="{{ photo.image.url }}" alt="">
+                    {% elif photo.image_path %}<img style="--stack-order:{{ forloop.counter0 }}" src="{% static photo.image_path %}" alt="">{% endif %}
+                    {% endif %}{% endfor %}
+                </span>
+                <span class="talent-gallery-cluster-copy"><span class="talent-section-kicker">A collection of moments</span><strong>Explore the programme photos</strong><small>{{ event.photos.all|length }} photos with captions</small></span>
+                <span class="talent-gallery-cluster-action"><i class="fas fa-images" aria-hidden="true"></i><span data-gallery-action>Open gallery</span><i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+            </button>
+            <noscript><style>.talent-gallery-cluster{display:none!important}.talent-gallery[hidden]{display:grid!important}</style></noscript>
+        <div class="talent-gallery" id="talent-gallery-{{ event.pk }}" hidden>
             {% for photo in event.photos.all %}
-            {% if photo.image %}<a class="talent-photo" href="{{ photo.image.url }}" target="_blank" rel="noopener noreferrer"><img src="{{ photo.image.url }}" alt="{{ photo.alt_text }}" loading="lazy"><span>{{ photo.caption }}</span></a>
-            {% elif photo.image_path %}<a class="talent-photo" href="{% static photo.image_path %}" target="_blank" rel="noopener noreferrer"><img src="{% static photo.image_path %}" alt="{{ photo.alt_text }}" loading="lazy"><span>{{ photo.caption }}</span></a>{% endif %}
+            {% if photo.image %}<a class="talent-photo" style="--photo-order:{{ forloop.counter0 }}" href="{{ photo.image.url }}" target="_blank" rel="noopener noreferrer"><img src="{{ photo.image.url }}" alt="{{ photo.alt_text }}" loading="lazy"><span>{{ photo.caption }}</span></a>
+            {% elif photo.image_path %}<a class="talent-photo" style="--photo-order:{{ forloop.counter0 }}" href="{% static photo.image_path %}" target="_blank" rel="noopener noreferrer"><img src="{% static photo.image_path %}" alt="{{ photo.alt_text }}" loading="lazy"><span>{{ photo.caption }}</span></a>{% endif %}
             {% endfor %}
+        </div>
         </div>
         {% endif %}
     </section>
@@ -102,4 +115,40 @@
         <div class="ecosystem-cta-links"><a class="talent-button" href="{% url 'innovators' %}">Meet the innovators <i class="fas fa-arrow-right" aria-hidden="true"></i></a><a class="ecosystem-cta-secondary" href="{% url 'staff:startups' %}">Browse startups</a></div>
     </section>
 </main>
+<script>
+(function () {
+    document.querySelectorAll('.talent-gallery-stage').forEach(function (stage) {
+        var button = stage.querySelector('.talent-gallery-cluster');
+        var gallery = stage.querySelector('.talent-gallery');
+        var action = stage.querySelector('[data-gallery-action]');
+        var closeTimer;
+        if (!button || !gallery) return;
+
+        button.addEventListener('click', function () {
+            var isOpen = button.getAttribute('aria-expanded') === 'true';
+            window.clearTimeout(closeTimer);
+            if (isOpen) {
+                button.setAttribute('aria-expanded', 'false');
+                if (action) action.textContent = 'Open gallery';
+                gallery.classList.remove('is-expanding');
+                gallery.classList.add('is-collapsing');
+                closeTimer = window.setTimeout(function () {
+                    gallery.hidden = true;
+                    gallery.classList.remove('is-collapsing');
+                }, 320);
+                return;
+            }
+
+            gallery.hidden = false;
+            gallery.classList.remove('is-collapsing');
+            button.setAttribute('aria-expanded', 'true');
+            if (action) action.textContent = 'Close gallery';
+            window.requestAnimationFrame(function () {
+                gallery.classList.add('is-expanding');
+                window.setTimeout(function () { gallery.classList.remove('is-expanding'); }, 850);
+            });
+        });
+    });
+}());
+</script>
 {% endblock %}
